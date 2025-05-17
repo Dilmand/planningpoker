@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning Poker</title>
+  <link rel="stylesheet" href="/src/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- Initial view - Join room -->
+    <div id="join-view" class="view">
+      <div class="card">
+        <h1>Planning Poker</h1>
+        <div class="join-form">
+          <input type="text" id="roomId" placeholder="Room ID" class="form-input">
+          <input type="text" id="participantName" placeholder="Your Name" class="form-input">
+          <button id="joinButton" class="btn primary-btn">Join Room</button>
+        </div>
+        <div id="joinError" class="error-message"></div>
+      </div>
+    </div>
+
+    <!-- Main view - Room with voting -->
+    <div id="room-view" class="view hidden">
+      <header class="room-header">
+        <div class="room-info">
+          <div class="team-info">
+            <div class="team-avatar">
+              <img src="/src/assets/team-avatar.svg" alt="Team">
+            </div>
+            <div>
+              <h2 id="team-name">Team Name</h2>
+              <p>Voting: <span id="current-story">Add story</span></p>
+            </div>
+          </div>
+        </div>
+        <div class="room-actions">
+          <button id="storyButton" class="btn outline-btn">
+            <span class="icon">📝</span>
+            <span>Change Story</span>
+          </button>
+          <button id="revealButton" class="btn outline-btn">
+            <span class="icon">👁️</span>
+            <span>Reveal Cards</span>
+          </button>
+          <button id="resetButton" class="btn outline-btn">
+            <span class="icon">🔄</span>
+            <span>Reset</span>
+          </button>
+          <button id="inviteButton" class="btn outline-btn">
+            <span class="icon">👥</span>
+            <span>Invite</span>
+          </button>
+          <button id="issuesButton" class="btn icon-btn">
+            <span class="icon">📋</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="content-container">
+        <div class="poker-table">
+          <div class="participant-circle">
+            <!-- Participants will be added dynamically in a circle -->
+            <div id="participants-container" class="participants-container"></div>
+            
+            <!-- Center message -->
+            <div id="table-center" class="table-center">
+              <p>Waiting for players to vote...</p>
+            </div>
+          </div>
+          
+          <!-- Card selection area at bottom -->
+          <div class="card-selection">
+            <p class="choose-prompt">Choose your card 👇</p>
+            <div id="card-deck" class="card-deck">
+              <!-- Cards will be added by JavaScript -->
+            </div>
+          </div>
+        </div>
+        
+        <!-- Side panel for issues -->
+        <div id="issues-panel" class="issues-panel hidden">
+          <div class="issues-header">
+            <h3>Issues List</h3>
+            <div class="issues-actions">
+              <button id="refreshIssuesBtn" class="icon-btn">
+                <span class="icon">🔄</span>
+              </button>
+              <button id="closeIssuesBtn" class="icon-btn">
+                <span class="icon">✕</span>
+              </button>
+            </div>
+          </div>
+          
+          <div id="issues-list" class="issues-list">
+            <!-- Issues will be added here -->
+          </div>
+          
+          <button id="addIssueBtn" class="btn add-issue-btn">
+            <span class="icon">+</span>
+            <span>Add Issue</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Login -->
+    <div id="admin-login-view" class="view hidden">
+      <div class="card">
+        <h1>Admin Login</h1>
+        <div class="join-form">
+          <input type="text" id="username" placeholder="Username" class="form-input">
+          <input type="password" id="password" placeholder="Password" class="form-input">
+          <button id="loginButton" class="btn primary-btn">Login</button>
+        </div>
+        <div id="loginError" class="error-message"></div>
+      </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-view" class="view hidden">
+      <div class="admin-container">
+        <header class="admin-header">
+          <h1>Planning Poker Admin</h1>
+          <button id="adminLogoutButton" class="btn secondary-btn">Logout</button>
+        </header>
+
+        <div class="admin-tabs">
+          <button id="roomsTabButton" class="tab-btn active">Rooms</button>
+          <button id="ipBlockingTabButton" class="tab-btn">IP Blocking</button>
+          <button id="logsTabButton" class="tab-btn">Logs</button>
+        </div>
+
+        <div id="roomsTab" class="admin-tab-content">
+          <div class="action-bar">
+            <button id="createRoomButton" class="btn primary-btn">Create New Room</button>
+          </div>
+          <div id="roomsList" class="rooms-list">
+            <!-- Rooms will be listed here -->
+          </div>
+        </div>
+
+        <div id="ipBlockingTab" class="admin-tab-content hidden">
+          <div class="action-bar">
+            <input type="text" id="ipAddress" placeholder="IP Address" class="form-input">
+            <input type="text" id="blockReason" placeholder="Reason (optional)" class="form-input">
+            <button id="blockIPButton" class="btn primary-btn">Block IP</button>
+          </div>
+          <div id="blockedIPsList" class="blocked-ips-list">
+            <!-- Blocked IPs will be listed here -->
+          </div>
+        </div>
+
+        <div id="logsTab" class="admin-tab-content hidden">
+          <div class="filters">
+            <select id="logLevel" class="form-select">
+              <option value="">All Levels</option>
+              <option value="INFO">Info</option>
+              <option value="WARN">Warning</option>
+              <option value="ERROR">Error</option>
+              <option value="DEBUG">Debug</option>
+            </select>
+            <input type="date" id="dateFrom" class="form-input" placeholder="From Date">
+            <input type="date" id="dateTo" class="form-input" placeholder="To Date">
+            <input type="text" id="searchTerm" class="form-input" placeholder="Search...">
+            <button id="filterLogsButton" class="btn secondary-btn">Apply Filters</button>
+          </div>
+          <div id="logsList" class="logs-list">
+            <!-- Logs will be listed here -->
+          </div>
+          <div class="pagination" id="logsPagination">
+            <!-- Pagination controls will be added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Story details modal -->
+    <div id="story-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Story Details</h3>
+          <button id="closeModalBtn" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="storyNameInput" class="form-input" placeholder="Enter story title">
+          <textarea id="storyDescriptionInput" class="form-textarea" placeholder="Enter story description (optional)"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="saveStoryBtn" class="btn primary-btn">Save</button>
+          <button id="cancelStoryBtn" class="btn secondary-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/ts/main.ts"></script>
+</body>
+</html> 

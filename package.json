@@ -1,0 +1,26 @@
+{
+  "name": "planningpoker",
+  "version": "1.0.0",
+  "description": "Agile Planning Poker Application",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "start": "npm run start --workspace=backend"
+  },
+  "keywords": [
+    "agile",
+    "planning",
+    "poker",
+    "scrum"
+  ],
+  "author": "",
+  "license": "ISC"
+} 
