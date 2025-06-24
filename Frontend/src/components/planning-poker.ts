@@ -1,4 +1,3 @@
-/** A small web component which enable us to integrate a small quiz into a webpage. */
 const plunningPokerStyles = new CSSStyleSheet();
 plunningPokerStyles.replaceSync(``);
 
