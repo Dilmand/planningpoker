@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const players = document.querySelectorAll(".player");
             players.forEach((player, i) => {
                 const name = player.querySelector("span")?.innerText || `Spieler ${i + 1}`;
-                const imgUrl = `https://i.pravatar.cc/50?img=${i + 1}`;
+                const imgUrl = `avatare/avatar_${i + 1}.jpeg`;
 
                 // Alte Karte entfernen
                 const card = player.querySelector(".card-value");
