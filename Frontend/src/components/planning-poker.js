@@ -26,15 +26,13 @@ class PlanningPoker extends HTMLElement {
 
   async loadStyles() {
     try {
-      const cssUrl = new URL('./planning-poker.css', import.meta.url).toString();
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = cssUrl;
-      this.shadowRoot.appendChild(link);
+      const response = await fetch('components/planning-poker.css');
+      const css = await response.text();
+      const style = document.createElement('style');
+      style.textContent = css;
+      this.shadowRoot.appendChild(style);
     } catch (e) {
-      // Fallback für den Fall, dass import.meta nicht verfügbar ist
-      console.log("Using fallback CSS loading method");
-      this.loadStylesFallback();
+      console.error("CSS konnte nicht geladen werden:", e);
     }
   }
 
@@ -124,15 +122,29 @@ class PlanningPoker extends HTMLElement {
     }, 3000);
   }
 
+  async injectStyles() {
+    if (!this._styleElement) {
+      const response = await fetch('components/planning-poker.css');
+      const css = await response.text();
+      this._styleElement = document.createElement('style');
+      this._styleElement.textContent = css;
+    }
+    if (this.shadowRoot.firstChild !== this._styleElement) {
+      this.shadowRoot.prepend(this._styleElement);
+    }
+  }
+
   connectedCallback() {
     const wsURL = this.getAttribute("ws-url");
 
-    this.loadTemplate('home').then(template => {
+    this.loadTemplate('home').then(async template => {
       this.shadowRoot.innerHTML = template;
+      await this.injectStyles();
       this._setupHomePageListeners(wsURL); // Neue Methode für die Listener
     }).catch(err => {
       console.error("Error loading home template:", err);
       this.shadowRoot.innerHTML = "<div>Error loading application</div>";
+      this.injectStyles();
     });
   }
 
@@ -257,10 +269,40 @@ class PlanningPoker extends HTMLElement {
       roomName: payload.roomName || ''
     });
     this.shadowRoot.innerHTML = renderedTemplate;
+    await this.injectStyles();
 
-    this.shadowRoot.querySelectorAll('.card').forEach(card => {
-      card.addEventListener('click', () => {
-        const voteValue = card.getAttribute('data-value');
+    // Spieler dynamisch rendern (aus Payload, falls vorhanden)
+    const playersSection = this.shadowRoot.getElementById('playersSection');
+    if (playersSection && payload.players) {
+      playersSection.innerHTML = '';
+      payload.players.forEach((player, i) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player';
+        playerDiv.dataset.value = player.value || '?';
+        if (player.isOwn) playerDiv.dataset.own = 'true';
+        const img = document.createElement('img');
+        img.src = `avatare/avatar_${i + 1}.jpeg`;
+        img.alt = player.userName;
+        playerDiv.appendChild(img);
+        const span = document.createElement('span');
+        span.innerText = player.userName;
+        playerDiv.appendChild(span);
+        playersSection.appendChild(playerDiv);
+      });
+    }
+
+    // Kartenwahl
+    this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.shadowRoot.querySelectorAll('.card-select button').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        // Eigene Karte setzen (Joiner)
+        const ownPlayer = this.shadowRoot.querySelector('.player[data-own="true"]');
+        if (ownPlayer) {
+          ownPlayer.dataset.value = btn.getAttribute('data-value');
+        }
+        // Vote senden
+        const voteValue = btn.getAttribute('data-value');
         ws.send(JSON.stringify({
           type: "joiner",
           payload: { action: "vote", roomId: payload.roomId, voteValue, storyId: "current" }
@@ -268,6 +310,7 @@ class PlanningPoker extends HTMLElement {
       });
     });
 
+    // Leave Room
     this.shadowRoot.getElementById('leaveRoomButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "joiner",
@@ -283,32 +326,149 @@ class PlanningPoker extends HTMLElement {
       roomName: payload.roomName
     });
     this.shadowRoot.innerHTML = renderedTemplate;
-    
-    // Wenn es eine Teilnehmerliste in der Payload gibt, fügen wir sie hinzu
-    const participantsList = this.shadowRoot.getElementById('participantsList');
-    if (participantsList && payload.participants) {
-      // Teilnehmerliste mit vorhandenen Teilnehmern füllen
-      payload.participants.forEach(participant => {
-        const listItem = document.createElement('li');
-        listItem.setAttribute('data-user-id', participant.userId);
-        listItem.textContent = participant.userName;
-        participantsList.appendChild(listItem);
+    await this.injectStyles();
+
+    // Spieler dynamisch rendern (aus Payload, falls vorhanden)
+    const playersSection = this.shadowRoot.getElementById('playersSection');
+    if (playersSection && payload.players) {
+      playersSection.innerHTML = '';
+      payload.players.forEach((player, i) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player';
+        playerDiv.dataset.value = player.value || '?';
+        if (player.isOwn) playerDiv.dataset.own = 'true';
+        const img = document.createElement('img');
+        img.src = `avatare/avatar_${i + 1}.jpeg`;
+        img.alt = player.userName;
+        playerDiv.appendChild(img);
+        const span = document.createElement('span');
+        span.innerText = player.userName;
+        playerDiv.appendChild(span);
+        playersSection.appendChild(playerDiv);
       });
     }
 
+    // Kartenwahl (nur für Admin selbst)
+    this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.shadowRoot.querySelectorAll('.card-select button').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        // Eigene Karte setzen (Admin)
+        const ownPlayer = this.shadowRoot.querySelector('.player[data-own="true"]');
+        if (ownPlayer) {
+          ownPlayer.dataset.value = btn.getAttribute('data-value');
+        }
+        // Vote senden
+        const voteValue = btn.getAttribute('data-value');
+        ws.send(JSON.stringify({
+          type: "admin",
+          payload: { action: "vote", roomId: payload.roomId, voteValue, storyId: "current" }
+        }));
+      });
+    });
+
+    // Reveal Cards
     this.shadowRoot.getElementById('revealCardsButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "admin",
         payload: { action: "revealCards", roomId: payload.roomId, storyId: "current" }
       }));
+      // Kartenwerte anzeigen und Durchschnitt berechnen
+      const players = this.shadowRoot.querySelectorAll('.player');
+      const values = [];
+      players.forEach((player, index) => {
+        const value = player.dataset.value || '?';
+        const num = parseInt(value);
+        // Avatar entfernen
+        const img = player.querySelector('img');
+        if (img) img.remove();
+        // Alte Karte entfernen
+        const oldCard = player.querySelector('.card-value');
+        if (oldCard) oldCard.remove();
+        // Neue Karte anzeigen
+        const card = document.createElement('div');
+        card.className = 'card-value';
+        card.innerText = value !== '?' ? value : '?';
+        player.insertBefore(card, player.querySelector('span'));
+        if (!isNaN(num)) values.push(num);
+      });
+      // Durchschnitt anzeigen
+      const avg = values.length > 0 ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : '?';
+      const avgDisplay = this.shadowRoot.querySelector('.average-display');
+      if (avgDisplay) avgDisplay.innerText = avg;
     });
 
+    // Reset Cards
+    this.shadowRoot.querySelector('.reset').addEventListener('click', () => {
+      const players = this.shadowRoot.querySelectorAll('.player');
+      players.forEach((player, i) => {
+        const name = player.querySelector('span')?.innerText || `Spieler ${i + 1}`;
+        const imgUrl = `avatare/avatar_${i + 1}.jpeg`;
+        // Alte Karte entfernen
+        const card = player.querySelector('.card-value');
+        if (card) card.remove();
+        // Avatar wieder einfügen, wenn nicht vorhanden
+        if (!player.querySelector('img')) {
+          const img = document.createElement('img');
+          img.src = imgUrl;
+          player.insertBefore(img, player.querySelector('span'));
+        }
+        player.dataset.value = '?';
+      });
+      // Auswahl entfernen
+      this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => btn.classList.remove('selected'));
+      // Durchschnitt zurücksetzen
+      const avgDisplay = this.shadowRoot.querySelector('.average-display');
+      if (avgDisplay) avgDisplay.innerText = '?';
+    });
+
+    // Leave Room
     this.shadowRoot.getElementById('leaveAdminRoomButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "admin",
         payload: { action: "leaveRoom", roomId: payload.roomId }
       }));
     });
+
+    // Teilnehmerliste (Status/Block-Logik)
+    const participantsList = this.shadowRoot.getElementById('participantsList');
+    if (participantsList && payload.participants) {
+      participantsList.innerHTML = '';
+      payload.participants.forEach(participant => {
+        const listItem = document.createElement('li');
+        listItem.setAttribute('data-user-id', participant.userId);
+        listItem.textContent = participant.userName + ' ';
+        // Statusanzeige
+        const status = document.createElement('span');
+        status.textContent = participant.blocked ? '🚫' : '✅';
+        listItem.appendChild(status);
+        // Dropdown für Aktionen
+        const select = document.createElement('select');
+        select.innerHTML = `
+          <option>Aktion wählen</option>
+          <option>User blockieren</option>
+          <option>User entblockieren</option>
+        `;
+        select.addEventListener('change', () => {
+          if (select.value === 'User blockieren') {
+            status.textContent = '🚫';
+            ws.send(JSON.stringify({
+              type: 'admin',
+              payload: { action: 'blockUser', roomId: payload.roomId, targetClientId: participant.userId }
+            }));
+          } else if (select.value === 'User entblockieren') {
+            status.textContent = '✅';
+            ws.send(JSON.stringify({
+              type: 'admin',
+              payload: { action: 'unblockUser', roomId: payload.roomId, targetClientId: participant.userId }
+            }));
+          }
+          select.value = 'Aktion wählen';
+        });
+        listItem.appendChild(select);
+        participantsList.appendChild(listItem);
+      });
+    }
   }
 }
 customElements.define("planning-poker", PlanningPoker);
