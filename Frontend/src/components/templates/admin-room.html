@@ -1,17 +1,38 @@
-<main>
-<h2>Room Created Successfully</h2>
-<p>Room Code: {{roomId}}</p>
-<p>Room Name: {{roomName}}</p>
-<p>Share this code with your team to join the room.</p>
-<div class="admin-controls">
-  <button id="revealCardsButton">Reveal Cards</button>
-  <button id="startNewVoteButton">Start New Vote</button>
-  <button id="leaveAdminRoomButton">Close Room</button>
+<div class="layout">
+  <main>
+    <header>
+      <p class="room-code">Room Code: <strong>{{roomId}}</strong></p>
+      <h1>{{roomName}}</h1>
+    </header>
+
+    <div class="average-wrapper">
+      <label>Durchschnitt</label>
+      <div class="average-display">?</div>
+    </div>
+
+    <section class="circle-layout" id="playersSection">
+      <!-- Spieler werden dynamisch eingefügt -->
+    </section>
+
+    <footer>
+      <p>Choose your card 👇</p>
+      <nav class="card-select">
+        <button data-value="0">0</button><button data-value="1">1</button><button data-value="2">2</button>
+        <button data-value="3">3</button><button data-value="5">5</button><button data-value="8">8</button>
+        <button data-value="13">13</button>
+      </nav>
+      <div class="control-buttons">
+        <button id="revealCardsButton" class="reveal reveal-below">Reveal cards</button>
+        <button class="reset">Reset cards</button>
+        <button id="leaveAdminRoomButton" class="leave-room">Leave Room</button>
+      </div>
+    </footer>
+  </main>
+  <aside>
+    <h2>All Participants</h2>
+    <p>View and manage all users within the room</p>
+    <ul id="participantsList">
+      <!-- Teilnehmer werden dynamisch eingefügt -->
+    </ul>
+  </aside>
 </div>
-<div class="participants">
-  <h3>Participants</h3>
-  <ul id="participantsList">
-    <!-- Participants will be listed here -->
-  </ul>
-</div>
-</main>
