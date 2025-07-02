@@ -8,14 +8,12 @@ class PlanningPoker extends HTMLElement {
     this.showToast = this.showToast.bind(this);
     this.loadTemplate = this.loadTemplate.bind(this);
     this.renderTemplate = this.renderTemplate.bind(this);
-
-    const linkElem = document.createElement('link');
-    linkElem.setAttribute('rel', 'stylesheet');
-    linkElem.setAttribute('href', 'components/planning-poker.css');
-    shadow.appendChild(linkElem);
+    this.loadStyles = this.loadStyles.bind(this);
 
     // Initial loading indicator
     shadow.innerHTML = '<div>Loading...</div>';
+
+    this.loadStyles();
 
     // Load the initial template
     this.loadTemplate('home').then(template => {
@@ -24,6 +22,20 @@ class PlanningPoker extends HTMLElement {
       console.error("Error loading template:", err);
       this.shadowRoot.innerHTML = "<div>Error loading application</div>";
     });
+  }
+
+  async loadStyles() {
+    try {
+      const cssUrl = new URL('./planning-poker.css', import.meta.url).toString();
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = cssUrl;
+      this.shadowRoot.appendChild(link);
+    } catch (e) {
+      // Fallback für den Fall, dass import.meta nicht verfügbar ist
+      console.log("Using fallback CSS loading method");
+      this.loadStylesFallback();
+    }
   }
 
   // Load an HTML template from the templates directory
