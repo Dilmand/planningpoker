@@ -1,10 +1,10 @@
 import { IMessageHandler } from '../core/webSocketServer';
 import { WebSocketClient } from '../core/webSocketClient';
-import { IClientMessage } from '../core/webSocketClient';
 import { RoomManager } from '../core/roomManager';
+import { WebSocketServer } from '../core/webSocketServer';
 
 export interface JoinerPayload {
-    action: 'join' | 'vote' | 'reveal' | 'leave';
+    action: 'joinRoom' | 'vote' | 'revealCards' | 'leaveRoom';
     roomId: string;
     userName?: string;
     voteValue?: string;
@@ -13,68 +13,103 @@ export interface JoinerPayload {
 
 export class JoinerHandler implements IMessageHandler {
     private roomManager: RoomManager;
+    private webSocketServer: WebSocketServer;
 
-    constructor() {
+    constructor(webSocketServer: WebSocketServer) {
         this.roomManager = new RoomManager();
+        this.webSocketServer = webSocketServer;
     }
 
-    async handle(client: WebSocketClient, message: IClientMessage): Promise<void> {
+    async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
 
-        console.log(`Joiner action received from client ${client.id}:`, message.payload);
+        console.log(`Joiner action received from client ${client.id}:`, receivedPayload);
         
         try {
-            const payload = this.validatePayload(message.payload);
+            const payload = this.validatePayload(receivedPayload);
             if (!payload) {
-                await this.sendError(client, 'Invalid joiner payload. Required fields: action, roomId');
+                await this.send(client, 'error', 'Invalid joiner payload. Required fields: action, roomId');
                 return;
             }
             
             await this.processJoinerAction(client, payload);
         } catch (error: any) {
-            await this.sendError(client, `Error processing joiner action: ${error.message}`);
+            await this.send(client, 'error', `Error processing joiner action: ${error.message}`);
         }
     }
     
     private validatePayload(payload: any): JoinerPayload | null {
-        if (!payload || !payload.action || !payload.roomId) {
-            return null;
-        }
-
-        // Validate action-specific required fields
-        if (payload.action === 'join' && !payload.userName) {
-            return null;
-        }
-        if (payload.action === 'vote' && (!payload.voteValue || !payload.storyId)) {
-            return null;
-        }
-        if (payload.action === 'reveal' && !payload.storyId) {
-            return null;
-        }
-
+    
         return payload as JoinerPayload;
     }
     
     private async processJoinerAction(client: WebSocketClient, payload: JoinerPayload): Promise<void> {
-        const actionHandlers: Record<string, () => Promise<void>> = {
-            'join': async () => {
+        const actionHandlers: Record<JoinerPayload["action"], () => Promise<void>> = {
+            'joinRoom': async () => {
                 if (!payload.userName) {
-                    await this.sendError(client, 'User name is required for join action');
+                    console.log(`User name is required for join action from client ${client.id}`);
+                    await this.send(client, 'error', 'User name is required for join action');
                     return;
                 }
-                this.roomManager.joinRoom(payload.roomId, client.id);
-                await this.sendJoinSuccess(client, payload);
+                client.setClientName(payload.userName);
+                const roomName = this.roomManager.getRoomName(payload.roomId);
+                const joined = this.roomManager.joinRoom(payload.roomId, client.id);
+                
+                if (joined) {
+                    // Get all clients in the room
+                    const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
+                    const otherClients = allClientsInRoom.filter(id => id !== client.id);
+                    
+                    // Get participant details for all existing clients
+                    const participants = [];
+                    for (const clientId of allClientsInRoom) {
+                        const clientObj = this.webSocketServer.getClient(clientId);
+                        if (clientObj) {
+                            participants.push({
+                                userId: clientId,
+                                userName: clientObj.getClientName(),
+                                isAdmin: this.roomManager.isAdmin(payload.roomId, clientId)
+                            });
+                        }
+                    }
+                    
+                    // Send success response to the joining client with the current participant list
+                    await this.send(client, 'success', {
+                        action: 'joinRoom',
+                        roomId: payload.roomId,
+                        roomName: roomName,
+                        userName: payload.userName,
+                        participants: participants
+                    });
+                    
+                    // Broadcast to all other clients in the room
+                    this.webSocketServer.broadcast(otherClients, {
+                        type: 'notification',
+                        payload: {
+                            action: 'userJoined',
+                            roomId: payload.roomId,
+                            userName: payload.userName,
+                            userId: client.id
+                        }
+                    });
+                } else {
+                    await this.send(client, 'error', `Failed to join room ${payload.roomId}`);
+                }
             },
             'vote': async () => {
                 if (!payload.voteValue || !payload.storyId) {
-                    await this.sendError(client, 'Vote value and story ID are required for vote action');
+                    await this.send(client, 'error', 'Vote value and story ID are required for vote action');
                     return;
                 }
                 // Store the vote for this user and story
-                await this.sendSuccess(client, `Your vote (${payload.voteValue}) has been recorded`);
+                await this.send(client, 'success', {
+                    action: 'vote',
+                    storyId: payload.storyId,
+                    voteValue: payload.voteValue
+                });
             },
-            'reveal': async () => {
+            'revealCards': async () => {
                 if (!payload.storyId) {
-                    await this.sendError(client, 'Story ID is required for reveal action');
+                    await this.send(client, 'error', 'Story ID is required for reveal action');
                     return;
                 }
                 
@@ -83,14 +118,34 @@ export class JoinerHandler implements IMessageHandler {
                 
                 if (allVoted) {
                     // Reveal the votes if everyone has voted
-                    await this.sendSuccess(client, `Votes have been revealed for story ${payload.storyId}`);
+                    await this.send(client, 'success', {
+                        action: 'revealCards',
+                        storyId: payload.storyId
+                    });
                 } else {
-                    await this.sendError(client, 'Cannot reveal votes until all participants have voted');
+                    await this.send(client, 'error', 'Cannot reveal votes until all participants have voted');
                 }
             },
-            'leave': async () => {
+            'leaveRoom': async () => {
+                // Notify others before this client leaves
+                const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
+                const otherClients = allClientsInRoom.filter(id => id !== client.id);
+                
+                this.webSocketServer.broadcast(otherClients, {
+                    type: 'notification',
+                    payload: {
+                        action: 'userLeft',
+                        roomId: payload.roomId,
+                        userName: client.getClientName(),
+                        userId: client.id
+                    }
+                });
+                
                 this.roomManager.leaveRoom(payload.roomId, client.id);
-                await this.sendSuccess(client, `You have left room ${payload.roomId}`);
+                await this.send(client, 'success', {
+                    action: 'leaveRoom',
+                    roomId: payload.roomId
+                });
             }
         };
         
@@ -98,31 +153,13 @@ export class JoinerHandler implements IMessageHandler {
         if (handler) {
             await handler();
         } else {
-            await this.sendError(client, `Unknown joiner action: ${payload.action}`);
+            await this.send(client, 'error', `Unknown joiner action: ${payload.action}`);
         }
     }
     
-    private async sendJoinSuccess(client: WebSocketClient, payload: JoinerPayload): Promise<void> {
+    private async send(client: WebSocketClient, type: string, message: any): Promise<void> {
         await client.send({ 
-            type: 'joinSuccess', 
-            payload: {
-                roomId: payload.roomId,
-                userName: payload.userName,
-                message: `Room ${payload.roomId} joined as ${payload.userName}`
-            }
-        });
-    }
-    
-    private async sendSuccess(client: WebSocketClient, message: string): Promise<void> {
-        await client.send({ 
-            type: 'success', 
-            payload: message 
-        });
-    }
-    
-    private async sendError(client: WebSocketClient, message: string): Promise<void> {
-        await client.send({ 
-            type: 'error', 
+            type: type, 
             payload: message 
         });
     }

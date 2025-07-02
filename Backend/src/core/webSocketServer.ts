@@ -9,7 +9,7 @@ export interface IServerMessage {
 }
 
 export interface IMessageHandler {
-    handle(client: WebSocketClient, message: IClientMessage): Promise<void>;
+    handle(client: WebSocketClient, message: any): Promise<void>;
 }
 
 export class WebSocketServer {
@@ -51,7 +51,7 @@ export class WebSocketServer {
         const handler = this.messageHandlers.get(message.type);
         if (handler) {
             try {
-                await handler.handle(client, message);
+                await handler.handle(client, message.payload);
             } catch (error: any) {
                 console.error(`Error handling message type "${message.type}" from client ${client.id}:`, error);
                 client.send({ type: 'error', payload: `Error processing your request: ${error.message}` });
@@ -61,28 +61,25 @@ export class WebSocketServer {
             client.send({ type: 'error', payload: `Unknown message type: "${message.type}"` });
         }
     }
-
-    // public async broadcast<T extends IServerMessage>(message: T, excludeClient?: WebSocketClient): Promise<void> {
-    //     const messageString = JSON.stringify(message);
-    //     const disconnectedClients: WebSocketClient[] = [];
-
-    //     for (const client of this.clients) {
-    //         if (client !== excludeClient) {
-    //             try {
-    //                 await client.send(message);
-    //             } catch (error) {
-    //                 console.warn(`Failed to broadcast to client ${client.id}:`, error);
-    //                 disconnectedClients.push(client);
-    //             }
-    //         }
-    //     }
-
-    //     // Entferne Clients, bei denen der Broadcast fehlgeschlagen ist (vermutlich disconnected)
-    //     for (const client of disconnectedClients) {
-    //         this.unregisterClient(client);
-    //     }
-    // }
-
+    
+    public getClient(clientId: string): WebSocketClient | undefined {
+        for (const client of this.clients) {
+            if (client.id === clientId) {
+                return client;
+            }
+        }
+        return undefined;
+    }
+    
+    public broadcast(clientIds: string[], message: IServerMessage): void {
+        for (const clientId of clientIds) {
+            const client = this.getClient(clientId);
+            if (client) {
+                client.send(message);
+            }
+        }
+    }
+    
     public close(): void {
         console.log("Shutting down WebSocket server...");
         this.wss.close(() => {

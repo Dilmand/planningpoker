@@ -7,17 +7,7 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <script src="components/planning-poker.js"></script>
-    <ld-planning-poker/>
-
-    <!-- Buttons zum Testen der Varianten -->
-    <button onclick="window.open('room.html', 'RoomJoiner', 'width=900,height=700')">
-        Raum als Teilnehmer beitreten
-    </button>
-    <button onclick="window.open('room_creator.html', 'RoomCreator', 'width=1000,height=700')">
-        Raum als Ersteller öffnen
-    </button>
-
-
+    <script type="module" src="components/planning-poker.js"></script>
+    <planning-poker ws-url="ws://localhost:8080"></planning-poker>
 </body>
 </html>
