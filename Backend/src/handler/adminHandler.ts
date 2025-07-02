@@ -1,11 +1,13 @@
 import { WebSocketClient } from '../core/webSocketClient';
 import { IMessageHandler } from '../core/webSocketServer';
 import { RoomManager } from '../core/roomManager';
-import { IClientMessage } from '../core/webSocketClient';
+import { WebSocketServer } from '../core/webSocketServer';
 
 export interface AdminPayload {
-    action: 'create' | 'remove' | 'block' | 'vote' | 'reveal' | 'leave';
-    roomId: string;
+    action: 'createRoom' | 'removeRoom' | 'blockUser' | 'vote' | 'revealCards' | 'leaveRoom';
+    roomId?: string;
+    roomName?: string;
+    userName?: string;
     targetClientId?: string;
     voteValue?: string;
     storyId?: string;
@@ -13,98 +15,177 @@ export interface AdminPayload {
 
 export class AdminHandler implements IMessageHandler {
     private roomManager: RoomManager;
+    private webSocketServer: WebSocketServer;
 
-    constructor() {
+    constructor(webSocketServer: WebSocketServer) {
         this.roomManager = new RoomManager();
+        this.webSocketServer = webSocketServer;
     }
 
-    async handle(client: WebSocketClient, message: IClientMessage): Promise<void> {
-        console.log(`Admin action received from client ${client.id}:`, message.payload);
-        
+    async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
+        console.log(`Admin action received from client ${client.id}:`, receivedPayload);
+
         try {
-            const payload = this.validatePayload(message.payload);
+            const payload = this.validatePayload(receivedPayload);
             if (!payload) {
-                await this.sendError(client, 'Invalid admin payload. Required fields: action, roomId');
+                await this.send(client, "error",'Invalid admin payload. Required fields: action, roomId');
                 return;
             }
-            
+
             await this.processAdminAction(client, payload);
         } catch (error: any) {
-            await this.sendError(client, `Error processing admin action: ${error.message}`);
+            await this.send(client,"error" ,`Error processing admin action: ${error.message}`);
         }
     }
-    
+
     private validatePayload(payload: any): AdminPayload | null {
-        if (!payload || !payload.action || !payload.roomId) {
+        if (!payload) {
             return null;
         }
         return payload as AdminPayload;
     }
-    
+
     private async processAdminAction(client: WebSocketClient, payload: AdminPayload): Promise<void> {
-        const actionHandlers: Record<string, () => Promise<void>> = {
-            'create': async () => {
-                this.roomManager.createRoom(payload.roomId, client.id);
-                this.roomManager.joinRoom(payload.roomId, client.id);
-                await this.sendSuccess(client, `Room ${payload.roomId} created successfully`);
-            },
-            'remove': async () => {
-                if (!payload.targetClientId) {
-                    await this.sendError(client, 'Target client ID is required for remove action');
+        const actionHandlers: Record<AdminPayload["action"], () => Promise<void>> = {
+            'createRoom': async () => {
+                if (!payload.userName) {
+                    console.log(`User name is required for create room action from client ${client.id}`);
+                    await this.send(client,"error" ,'User name is required for create room action');
                     return;
                 }
-                this.roomManager.leaveRoom(payload.roomId, payload.targetClientId);
-                await this.sendSuccess(client, `Client ${payload.targetClientId} has been removed from room ${payload.roomId}`);
+                if (!payload.roomName) {
+                    console.log(`Room name is required for create room action from client ${client.id}`);
+                    await this.send(client,"error", 'Room name is required for create room action');
+                    return;
+                }
+                client.setClientName(payload.userName);
+                const roomId = this.roomManager.createRoom(client.id, payload.roomName);
+                
+                // Get all clients in the room (should just be the admin at this point)
+                const allClientsInRoom = this.roomManager.getClientsInRoom(roomId);
+                
+                // Get participant details
+                const participants = [];
+                for (const clientId of allClientsInRoom) {
+                    const clientObj = this.webSocketServer.getClient(clientId);
+                    if (clientObj) {
+                        participants.push({
+                            userId: clientId,
+                            userName: clientObj.getClientName(),
+                            isAdmin: this.roomManager.isAdmin(roomId, clientId)
+                        });
+                    }
+                }
+                
+                await this.send(client, "success", {
+                    action: "createRoom",
+                    roomId: roomId,
+                    roomName: payload.roomName,
+                    participants: participants
+                });
             },
-            'block': async () => {
+            'removeRoom': async () => {
                 if (!payload.targetClientId) {
-                    await this.sendError(client, 'Target client ID is required for block action');
+                    await this.send(client, "error",'Target client ID is required for remove action');
+                    return;
+                }
+
+                if (!payload.roomId) {
+                    await this.send(client, "error", 'Room ID is required for remove action');
+                    return;
+                }
+
+                if (!this.roomManager.roomExists(payload.roomId)) {
+                    await this.send(client, "error", `Room ${payload.roomId} does not exist`);
+                    return;
+                }
+
+                this.roomManager.leaveRoom(payload.roomId, payload.targetClientId);
+                await this.send(client,"success" , {
+                    action: "removeRoom",
+                    roomId: payload.roomId,
+                    targetClientId: payload.targetClientId
+                });
+            },
+            'blockUser': async () => {
+                if (!payload.targetClientId) {
+                    await this.send(client, "error", 'Target client ID is required for block action');
                     return;
                 }
                 // Implementation for blocking would require tracking blocked IPs/clients
-                await this.sendSuccess(client, `Client ${payload.targetClientId} has been blocked`);
+                await this.send(client, "success", {
+                    action: "blockUser",
+                    targetClientId: payload.targetClientId
+                });
             },
             'vote': async () => {
                 if (!payload.voteValue || !payload.storyId) {
-                    await this.sendError(client, 'Vote value and story ID are required for vote action');
+                    await this.send(client, "error",'Vote value and story ID are required for vote action');
                     return;
                 }
-                // Store the vote
-                await this.sendSuccess(client, `Your vote (${payload.voteValue}) has been recorded`);
+                await this.send(client,"success", {
+                    action: "vote",
+                    storyId: payload.storyId,
+                    voteValue: payload.voteValue
+                });
             },
-            'reveal': async () => {
+            'revealCards': async () => {
                 if (!payload.storyId) {
-                    await this.sendError(client, 'Story ID is required for reveal action');
+                    await this.send(client,"error",'Story ID is required for reveal action');
                     return;
                 }
                 // Get all votes and reveal them
-                await this.sendSuccess(client, `Votes have been revealed for story ${payload.storyId}`);
+                await this.send(client, "success", {
+                    action: "revealCards",
+                    storyId: payload.storyId
+                });
             },
-            'leave': async () => {
+            'leaveRoom': async () => {
+                if (!payload.roomId) {
+                    await this.send(client, "error",'Room ID is required to leave a room');
+                    return;
+                }
+                if (!this.roomManager.roomExists(payload.roomId)) {
+                    await this.send(client,"error",`Room ${payload.roomId} does not exist`);
+                    return;
+                }
+                // Get client info and all clients in the room
+                const clientName = client.getClientName();
+                const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
+                const otherClients = allClientsInRoom.filter(id => id !== client.id);
+                
+                // Broadcast to all other clients that admin is leaving
+                this.webSocketServer.broadcast(otherClients, {
+                    type: 'notification',
+                    payload: {
+                        action: 'userLeft',
+                        roomId: payload.roomId,
+                        userName: clientName,
+                        userId: client.id,
+                        isAdmin: true
+                    }
+                });
+                
                 this.roomManager.leaveRoom(payload.roomId, client.id);
-                await this.sendSuccess(client, `You have left room ${payload.roomId}`);
+                await this.send(client,"success", {
+                    action: "leaveRoom",
+                    roomId: payload.roomId
+                });
             },
         };
-        
+
         const handler = actionHandlers[payload.action];
         if (handler) {
             await handler();
         } else {
-            await this.sendError(client, `Unknown admin action: ${payload.action}`);
+            await this.send(client,"error", `Unknown admin action: ${payload.action}`);
         }
     }
-    
-    private async sendSuccess(client: WebSocketClient, message: string): Promise<void> {
-        await client.send({ 
-            type: 'success', 
-            payload: message 
-        });
-    }
-    
-    private async sendError(client: WebSocketClient, message: string): Promise<void> {
-        await client.send({ 
-            type: 'error', 
-            payload: message 
+
+    private async send(client: WebSocketClient, type: string, message: any): Promise<void> {
+        await client.send({
+            type: type,
+            payload: message
         });
     }
 }

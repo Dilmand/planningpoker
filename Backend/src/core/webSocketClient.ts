@@ -11,6 +11,7 @@ export class WebSocketClient {
     public id: string;
     private ws: WebSocket;
     private server: WebSocketServer;
+    private clientName?: string;
 
     constructor(ws: WebSocket, server: WebSocketServer) {
         this.id = uuid();
@@ -22,6 +23,14 @@ export class WebSocketClient {
         this.ws.on('error', (error: Error) => this.handleError(error));
 
         console.log(`[Client ${this.id}] Connected.`);
+    }
+    
+    public setClientName(name: string): void {
+        this.clientName = name;
+    }
+    
+    public getClientName(): string {
+        return this.clientName || `Anonymous-${this.id.substring(0, 8)}`;
     }
 
     public async send<T extends IServerMessage>(message: T): Promise<void> {

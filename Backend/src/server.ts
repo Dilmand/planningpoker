@@ -8,8 +8,8 @@ const PORT = 8080;
 async function main() {
     const server = new WebSocketServer(PORT);
 
-    server.registerMessageHandler('admin', new AdminHandler());
-    server.registerMessageHandler('joiner', new JoinerHandler());
+    server.registerMessageHandler('admin', new AdminHandler(server));
+    server.registerMessageHandler('joiner', new JoinerHandler(server));
 
     process.on('SIGINT', () => server.close());
     process.on('SIGTERM', () => server.close());
