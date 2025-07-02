@@ -26,14 +26,9 @@ class PlanningPoker extends HTMLElement {
     });
   }
 
-  /**
-   * Load an HTML template from the templates directory
-   * @param {string} templateName - Name of the template file without .html extension
-   * @returns {Promise<string>} - The template HTML content
-   */
+  // Load an HTML template from the templates directory
   async loadTemplate(templateName) {
     try {
-      // Korrigierter Pfad ohne führendes './'
       const response = await fetch(`components/templates/${templateName}.html`);
       if (!response.ok) {
         throw new Error(`Failed to load template: ${response.status} ${response.statusText}`);
@@ -45,12 +40,7 @@ class PlanningPoker extends HTMLElement {
     }
   }
 
-  /**
-   * Render a template with data
-   * @param {string} template - The template HTML content
-   * @param {Object} data - Data to interpolate into the template
-   * @returns {string} - The rendered HTML
-   */
+  // Render a template with data
   renderTemplate(template, data = {}) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
       return data[key] !== undefined ? data[key] : '';
