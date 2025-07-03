@@ -50,15 +50,16 @@ export class JoinerHandler implements IMessageHandler {
                     await this.send(client, 'error', 'User name is required for join action');
                     return;
                 }
+
                 client.setClientName(payload.userName);
                 const roomName = this.roomManager.getRoomName(payload.roomId);
                 const joined = this.roomManager.joinRoom(payload.roomId, client.id);
-                
+
                 if (joined) {
                     // Get all clients in the room
                     const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
                     const otherClients = allClientsInRoom.filter(id => id !== client.id);
-                    
+
                     // Get participant details for all existing clients
                     const participants = [];
                     for (const clientId of allClientsInRoom) {
@@ -71,16 +72,25 @@ export class JoinerHandler implements IMessageHandler {
                             });
                         }
                     }
-                    
-                    // Send success response to the joining client with the current participant list
+
+                    // NEU: players-Array erzeugen, um im Frontend den Spielstatus darzustellen
+                    const players = participants.map(p => ({
+                        userId: p.userId,
+                        userName: p.userName,
+                        value: '?',                        // Noch keine Karte gewählt
+                        isOwn: p.userId === client.id      // Markiert den eigenen Spieler
+                    }));
+
+                    // Send success response to the joining client with the current participant list and players
                     await this.send(client, 'success', {
                         action: 'joinRoom',
                         roomId: payload.roomId,
                         roomName: roomName,
                         userName: payload.userName,
-                        participants: participants
+                        participants: participants,
+                        players: players // NEU: für Anzeige der Spieler im Frontend
                     });
-                    
+
                     // Broadcast to all other clients in the room
                     this.webSocketServer.broadcast(otherClients, {
                         type: 'notification',
@@ -130,7 +140,7 @@ export class JoinerHandler implements IMessageHandler {
                 // Notify others before this client leaves
                 const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
                 const otherClients = allClientsInRoom.filter(id => id !== client.id);
-                
+
                 this.webSocketServer.broadcast(otherClients, {
                     type: 'notification',
                     payload: {
@@ -140,7 +150,7 @@ export class JoinerHandler implements IMessageHandler {
                         userId: client.id
                     }
                 });
-                
+
                 this.roomManager.leaveRoom(payload.roomId, client.id);
                 await this.send(client, 'success', {
                     action: 'leaveRoom',

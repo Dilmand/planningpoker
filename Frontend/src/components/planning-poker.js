@@ -62,28 +62,91 @@ class PlanningPoker extends HTMLElement {
 
     switch (payload.action) {
       case 'userJoined':
-        // Display a toast or some notification that a user joined
         this.showToast(`${payload.userName} joined the room`);
 
-        // If this is an admin view, update the participants list
+        const playersSectionJoin = this.shadowRoot.getElementById('playersSection');
+        if (playersSectionJoin) {
+          const playerDiv = document.createElement('div');
+          playerDiv.className = 'player';
+          playerDiv.dataset.value = '?';
+          playerDiv.dataset.userId = payload.userId;
+
+          const img = document.createElement('img');
+          const existingCount = playersSectionJoin.children.length;
+          img.src = `avatare/avatar_${existingCount + 1}.jpeg`;
+          img.alt = payload.userName;
+
+          playerDiv.appendChild(img);
+
+          const span = document.createElement('span');
+          span.innerText = payload.userName;
+          playerDiv.appendChild(span);
+
+          playersSectionJoin.appendChild(playerDiv);
+        }
+
+        // Teilnehmerliste aktualisieren mit Block-/Entblock-Logik und korrekter Anzeige
         const participantsList = this.shadowRoot.getElementById('participantsList');
         if (participantsList) {
-          const listItem = document.createElement('li');
-          listItem.setAttribute('data-user-id', payload.userId);
-          listItem.textContent = payload.userName;
-          participantsList.appendChild(listItem);
+          // Neuen Listeneintrag nur anhängen, wenn noch nicht vorhanden
+          const existingItem = participantsList.querySelector(`li[data-user-id="${payload.userId}"]`);
+          if (!existingItem) {
+            const listItem = document.createElement('li');
+            listItem.setAttribute('data-user-id', payload.userId);
+            listItem.textContent = payload.userName + ' ';
+
+            // Statusanzeige
+            const status = document.createElement('span');
+            status.textContent = '✅'; // Standardmäßig unblocked
+            listItem.appendChild(status);
+
+            // Dropdown für Aktionen
+            const select = document.createElement('select');
+            select.innerHTML = `
+      <option>Aktion wählen</option>
+      <option>User blockieren</option>
+      <option>User entblockieren</option>
+    `;
+            select.addEventListener('change', () => {
+              if (select.value === 'User blockieren') {
+                status.textContent = '🚫';
+                ws.send(JSON.stringify({
+                  type: 'admin',
+                  payload: { action: 'blockUser', roomId: payload.roomId, targetClientId: payload.userId }
+                }));
+              } else if (select.value === 'User entblockieren') {
+                status.textContent = '✅';
+                ws.send(JSON.stringify({
+                  type: 'admin',
+                  payload: { action: 'unblockUser', roomId: payload.roomId, targetClientId: payload.userId }
+                }));
+              }
+              select.value = 'Aktion wählen'; // Zurücksetzen der Auswahl
+            });
+
+            listItem.appendChild(select);
+            participantsList.appendChild(listItem);
+          }
         }
         break;
 
       case 'userLeft':
         this.showToast(`${payload.userName} left the room`);
 
-        // Remove from participants list if it exists
+        // Spieler-UI im Spielerbereich entfernen
+        const leftPlayer = this.shadowRoot.querySelector(`.player[data-user-id="${payload.userId}"]`);
+        if (leftPlayer) {
+          leftPlayer.remove();
+        }
+
+        // Teilnehmerliste entfernen (nur Admin-Rooms)
         const departedUserElement = this.shadowRoot.querySelector(`li[data-user-id="${payload.userId}"]`);
         if (departedUserElement) {
           departedUserElement.remove();
         }
+
         break;
+
 
       default:
         console.log('Unknown notification action:', payload.action);

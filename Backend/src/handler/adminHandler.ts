@@ -49,22 +49,19 @@ export class AdminHandler implements IMessageHandler {
         const actionHandlers: Record<AdminPayload["action"], () => Promise<void>> = {
             'createRoom': async () => {
                 if (!payload.userName) {
-                    console.log(`User name is required for create room action from client ${client.id}`);
-                    await this.send(client,"error" ,'User name is required for create room action');
+                    await this.send(client, "error", 'User name is required for create room action');
                     return;
                 }
                 if (!payload.roomName) {
-                    console.log(`Room name is required for create room action from client ${client.id}`);
-                    await this.send(client,"error", 'Room name is required for create room action');
+                    await this.send(client, "error", 'Room name is required for create room action');
                     return;
                 }
+
                 client.setClientName(payload.userName);
                 const roomId = this.roomManager.createRoom(client.id, payload.roomName);
-                
-                // Get all clients in the room (should just be the admin at this point)
+
                 const allClientsInRoom = this.roomManager.getClientsInRoom(roomId);
-                
-                // Get participant details
+
                 const participants = [];
                 for (const clientId of allClientsInRoom) {
                     const clientObj = this.webSocketServer.getClient(clientId);
@@ -76,14 +73,29 @@ export class AdminHandler implements IMessageHandler {
                         });
                     }
                 }
-                
+
+                const players = [];
+                for (const clientId of allClientsInRoom) {
+                    const clientObj = this.webSocketServer.getClient(clientId);
+                    if (clientObj) {
+                        players.push({
+                            userId: clientId,
+                            userName: clientObj.getClientName(),
+                            value: '?',
+                            isOwn: clientId === client.id
+                        });
+                    }
+                }
+
                 await this.send(client, "success", {
                     action: "createRoom",
                     roomId: roomId,
                     roomName: payload.roomName,
-                    participants: participants
+                    participants: participants,
+                    players: players
                 });
             },
+
             'removeRoom': async () => {
                 if (!payload.targetClientId) {
                     await this.send(client, "error",'Target client ID is required for remove action');
