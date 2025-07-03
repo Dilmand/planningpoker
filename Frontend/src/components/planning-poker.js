@@ -2,18 +2,16 @@ class PlanningPoker extends HTMLElement {
   constructor() {
     super();
     const shadow = this.attachShadow({ mode: "open" });
+    this.loadedStyles = new Set(); // Track loaded styles
 
     // Bind methods to this
     this.handleNotification = this.handleNotification.bind(this);
     this.showToast = this.showToast.bind(this);
     this.loadTemplate = this.loadTemplate.bind(this);
     this.renderTemplate = this.renderTemplate.bind(this);
-    this.loadStyles = this.loadStyles.bind(this);
 
     // Initial loading indicator
     shadow.innerHTML = '<div>Loading...</div>';
-
-    this.loadStyles();
 
     // Load the initial template
     this.loadTemplate('home').then(template => {
@@ -24,19 +22,41 @@ class PlanningPoker extends HTMLElement {
     });
   }
 
-  async loadStyles() {
+  async loadTemplateStyles(templateName) {
+    // Don't reload if already loaded
+    if (this.loadedStyles.has(templateName)) return;
+
+    try {
+      const response = await fetch(`components/styles/${templateName}.css`);
+      if (response.ok) {
+        const css = await response.text();
+        const style = document.createElement('style');
+        style.setAttribute('data-template', templateName);
+        style.textContent = css;
+        this.shadowRoot.appendChild(style);
+        this.loadedStyles.add(templateName);
+      }
+    } catch (e) {
+      console.log(`No specific styles for ${templateName}`);
+    }
+  }
+
+  async loadMainStyles() {
+    if (this.loadedStyles.has('main')) return;
+
     try {
       const response = await fetch('components/planning-poker.css');
       const css = await response.text();
       const style = document.createElement('style');
+      style.setAttribute('data-template', 'main');
       style.textContent = css;
       this.shadowRoot.appendChild(style);
+      this.loadedStyles.add('main');
     } catch (e) {
       console.error("CSS konnte nicht geladen werden:", e);
     }
   }
 
-  // Load an HTML template from the templates directory
   async loadTemplate(templateName) {
     try {
       const response = await fetch(`components/templates/${templateName}.html`);
@@ -50,7 +70,6 @@ class PlanningPoker extends HTMLElement {
     }
   }
 
-  // Render a template with data
   renderTemplate(template, data = {}) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
       return data[key] !== undefined ? data[key] : '';
@@ -62,10 +81,8 @@ class PlanningPoker extends HTMLElement {
 
     switch (payload.action) {
       case 'userJoined':
-        // Display a toast or some notification that a user joined
         this.showToast(`${payload.userName} joined the room`);
 
-        // If this is an admin view, update the participants list
         const participantsList = this.shadowRoot.getElementById('participantsList');
         if (participantsList) {
           const listItem = document.createElement('li');
@@ -78,7 +95,6 @@ class PlanningPoker extends HTMLElement {
       case 'userLeft':
         this.showToast(`${payload.userName} left the room`);
 
-        // Remove from participants list if it exists
         const departedUserElement = this.shadowRoot.querySelector(`li[data-user-id="${payload.userId}"]`);
         if (departedUserElement) {
           departedUserElement.remove();
@@ -91,7 +107,6 @@ class PlanningPoker extends HTMLElement {
   }
 
   showToast(message) {
-    // Create toast if it doesn't exist
     let toast = this.shadowRoot.getElementById('toast');
     if (!toast) {
       toast = document.createElement('div');
@@ -112,26 +127,12 @@ class PlanningPoker extends HTMLElement {
       this.shadowRoot.appendChild(toast);
     }
 
-    // Set message and show toast
     toast.textContent = message;
     toast.style.opacity = '1';
 
-    // Hide after 3 seconds
     setTimeout(() => {
       toast.style.opacity = '0';
     }, 3000);
-  }
-
-  async injectStyles() {
-    if (!this._styleElement) {
-      const response = await fetch('components/planning-poker.css');
-      const css = await response.text();
-      this._styleElement = document.createElement('style');
-      this._styleElement.textContent = css;
-    }
-    if (this.shadowRoot.firstChild !== this._styleElement) {
-      this.shadowRoot.prepend(this._styleElement);
-    }
   }
 
   connectedCallback() {
@@ -139,12 +140,12 @@ class PlanningPoker extends HTMLElement {
 
     this.loadTemplate('home').then(async template => {
       this.shadowRoot.innerHTML = template;
-      await this.injectStyles();
-      this._setupHomePageListeners(wsURL); // Neue Methode für die Listener
+      // Load home-specific styles
+      await this.loadTemplateStyles('home');
+      this._setupHomePageListeners(wsURL);
     }).catch(err => {
       console.error("Error loading home template:", err);
       this.shadowRoot.innerHTML = "<div>Error loading application</div>";
-      this.injectStyles();
     });
   }
 
@@ -167,7 +168,6 @@ class PlanningPoker extends HTMLElement {
       return;
     }
 
-    // Show loading indicator
     this.showToast("Joining room...");
 
     const ws = new WebSocket(wsURL);
@@ -177,7 +177,7 @@ class PlanningPoker extends HTMLElement {
         payload: { action: "joinRoom", roomId, userName }
       }));
     };
-    this._setupWebSocketListeners(ws, 'joiner'); // Allgemeine Listener
+    this._setupWebSocketListeners(ws, 'joiner');
   }
 
   async _handleCreateRoom(wsURL) {
@@ -189,7 +189,6 @@ class PlanningPoker extends HTMLElement {
       return;
     }
 
-    // Show loading indicator
     this.showToast("Creating room...");
 
     const ws = new WebSocket(wsURL);
@@ -199,7 +198,7 @@ class PlanningPoker extends HTMLElement {
         payload: { action: "createRoom", roomName, userName }
       }));
     };
-    this._setupWebSocketListeners(ws, 'admin'); // Allgemeine Listener
+    this._setupWebSocketListeners(ws, 'admin');
   }
 
   _setupWebSocketListeners(ws, role) {
@@ -223,7 +222,6 @@ class PlanningPoker extends HTMLElement {
     ws.onclose = (event) => {
       console.log("WebSocket connection closed:", event);
       this.showToast("Disconnected from room.");
-      // Optionally: Attempt to reconnect or return to home screen
     };
     ws.onerror = (event) => {
       console.error("WebSocket error:", event);
@@ -264,14 +262,19 @@ class PlanningPoker extends HTMLElement {
 
   async _renderJoinerRoom(payload, ws) {
     const template = await this.loadTemplate('joiner-room');
+    
+    await this.loadMainStyles();
+    await this.loadTemplateStyles('joiner-room');
+
     const renderedTemplate = this.renderTemplate(template, {
       roomId: payload.roomId,
       roomName: payload.roomName || ''
     });
     this.shadowRoot.innerHTML = renderedTemplate;
-    await this.injectStyles();
+    
+    await this.loadMainStyles();
+    await this.loadTemplateStyles('joiner-room');
 
-    // Spieler dynamisch rendern (aus Payload, falls vorhanden)
     const playersSection = this.shadowRoot.getElementById('playersSection');
     if (playersSection && payload.players) {
       playersSection.innerHTML = '';
@@ -291,17 +294,14 @@ class PlanningPoker extends HTMLElement {
       });
     }
 
-    // Kartenwahl
     this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
       btn.addEventListener('click', () => {
         this.shadowRoot.querySelectorAll('.card-select button').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        // Eigene Karte setzen (Joiner)
         const ownPlayer = this.shadowRoot.querySelector('.player[data-own="true"]');
         if (ownPlayer) {
           ownPlayer.dataset.value = btn.getAttribute('data-value');
         }
-        // Vote senden
         const voteValue = btn.getAttribute('data-value');
         ws.send(JSON.stringify({
           type: "joiner",
@@ -310,7 +310,6 @@ class PlanningPoker extends HTMLElement {
       });
     });
 
-    // Leave Room
     this.shadowRoot.getElementById('leaveRoomButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "joiner",
@@ -321,14 +320,19 @@ class PlanningPoker extends HTMLElement {
 
   async _renderAdminRoom(payload, ws) {
     const template = await this.loadTemplate('admin-room');
+    
+    await this.loadMainStyles();
+    await this.loadTemplateStyles('admin-room');
+
     const renderedTemplate = this.renderTemplate(template, {
       roomId: payload.roomId,
       roomName: payload.roomName
     });
     this.shadowRoot.innerHTML = renderedTemplate;
-    await this.injectStyles();
+    
+    await this.loadMainStyles();
+    await this.loadTemplateStyles('admin-room');
 
-    // Spieler dynamisch rendern (aus Payload, falls vorhanden)
     const playersSection = this.shadowRoot.getElementById('playersSection');
     if (playersSection && payload.players) {
       playersSection.innerHTML = '';
@@ -348,17 +352,14 @@ class PlanningPoker extends HTMLElement {
       });
     }
 
-    // Kartenwahl (nur für Admin selbst)
     this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
       btn.addEventListener('click', () => {
         this.shadowRoot.querySelectorAll('.card-select button').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        // Eigene Karte setzen (Admin)
         const ownPlayer = this.shadowRoot.querySelector('.player[data-own="true"]');
         if (ownPlayer) {
           ownPlayer.dataset.value = btn.getAttribute('data-value');
         }
-        // Vote senden
         const voteValue = btn.getAttribute('data-value');
         ws.send(JSON.stringify({
           type: "admin",
@@ -367,47 +368,38 @@ class PlanningPoker extends HTMLElement {
       });
     });
 
-    // Reveal Cards
     this.shadowRoot.getElementById('revealCardsButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "admin",
         payload: { action: "revealCards", roomId: payload.roomId, storyId: "current" }
       }));
-      // Kartenwerte anzeigen und Durchschnitt berechnen
       const players = this.shadowRoot.querySelectorAll('.player');
       const values = [];
       players.forEach((player, index) => {
         const value = player.dataset.value || '?';
         const num = parseInt(value);
-        // Avatar entfernen
         const img = player.querySelector('img');
         if (img) img.remove();
-        // Alte Karte entfernen
         const oldCard = player.querySelector('.card-value');
         if (oldCard) oldCard.remove();
-        // Neue Karte anzeigen
         const card = document.createElement('div');
         card.className = 'card-value';
         card.innerText = value !== '?' ? value : '?';
         player.insertBefore(card, player.querySelector('span'));
         if (!isNaN(num)) values.push(num);
       });
-      // Durchschnitt anzeigen
       const avg = values.length > 0 ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : '?';
       const avgDisplay = this.shadowRoot.querySelector('.average-display');
       if (avgDisplay) avgDisplay.innerText = avg;
     });
 
-    // Reset Cards
     this.shadowRoot.querySelector('.reset').addEventListener('click', () => {
       const players = this.shadowRoot.querySelectorAll('.player');
       players.forEach((player, i) => {
         const name = player.querySelector('span')?.innerText || `Spieler ${i + 1}`;
         const imgUrl = `avatare/avatar_${i + 1}.jpeg`;
-        // Alte Karte entfernen
         const card = player.querySelector('.card-value');
         if (card) card.remove();
-        // Avatar wieder einfügen, wenn nicht vorhanden
         if (!player.querySelector('img')) {
           const img = document.createElement('img');
           img.src = imgUrl;
@@ -415,14 +407,11 @@ class PlanningPoker extends HTMLElement {
         }
         player.dataset.value = '?';
       });
-      // Auswahl entfernen
       this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => btn.classList.remove('selected'));
-      // Durchschnitt zurücksetzen
       const avgDisplay = this.shadowRoot.querySelector('.average-display');
       if (avgDisplay) avgDisplay.innerText = '?';
     });
 
-    // Leave Room
     this.shadowRoot.getElementById('leaveAdminRoomButton').addEventListener('click', () => {
       ws.send(JSON.stringify({
         type: "admin",
@@ -430,7 +419,6 @@ class PlanningPoker extends HTMLElement {
       }));
     });
 
-    // Teilnehmerliste (Status/Block-Logik)
     const participantsList = this.shadowRoot.getElementById('participantsList');
     if (participantsList && payload.participants) {
       participantsList.innerHTML = '';
@@ -438,11 +426,9 @@ class PlanningPoker extends HTMLElement {
         const listItem = document.createElement('li');
         listItem.setAttribute('data-user-id', participant.userId);
         listItem.textContent = participant.userName + ' ';
-        // Statusanzeige
         const status = document.createElement('span');
         status.textContent = participant.blocked ? '🚫' : '✅';
         listItem.appendChild(status);
-        // Dropdown für Aktionen
         const select = document.createElement('select');
         select.innerHTML = `
           <option>Aktion wählen</option>
