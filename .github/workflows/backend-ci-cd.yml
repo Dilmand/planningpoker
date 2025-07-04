@@ -34,18 +34,19 @@ jobs:
             dilmand/planningpoker-backend:latest
             dilmand/planningpoker-backend:${{ steps.git_sha.outputs.SHA_SHORT }}
 
+  test-runner:
+  runs-on: self-hosted
+  steps:
+    - name: Echo test
+      run: echo "Self-hosted runner works!"
+
   deploy:
     runs-on: self-hosted
-    needs: [build-and-push-backend]
+    needs: build-and-push-backend
     steps:
       - name: Deploy to Self-Hosted Runner
         run: |
           DEPLOY_PATH="/home/gruppe6" 
-
-          BACKEND_CHANGED="${{ needs.detect_changes.outputs.backend_changed }}"
-          FRONTEND_CHANGED="${{ needs.detect_changes.outputs.frontend_changed }}"
-
-          echo "--- Starting Deployment on Self-Hosted Runner ---"
 
           cd "$DEPLOY_PATH" || { echo "Error: Directory $DEPLOY_PATH not found."; exit 1; }
           echo "Changed to directory: $DEPLOY_PATH"
