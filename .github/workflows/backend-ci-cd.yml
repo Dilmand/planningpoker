@@ -5,7 +5,7 @@ on:
     branches:
       - feat/ci-cd-pipeline
     paths:
-      - 'Backend/**'
+      - "Backend/**"
 
 jobs:
   build-and-push-backend:
@@ -36,36 +36,22 @@ jobs:
 
   deploy:
     runs-on: self-hosted
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.build-and-push-backend.result == 'success' || needs.build-and-push-frontend.result == 'success')
-    needs: [build-and-push-backend, build-and-push-frontend, detect_changes]
+    needs: [build-and-push-backend]
     steps:
       - name: Deploy to Self-Hosted Runner
         run: |
-          DEPLOY_PATH="/opt/planning-poker" 
+          DEPLOY_PATH="/home/gruppe6" 
 
           BACKEND_CHANGED="${{ needs.detect_changes.outputs.backend_changed }}"
           FRONTEND_CHANGED="${{ needs.detect_changes.outputs.frontend_changed }}"
 
           echo "--- Starting Deployment on Self-Hosted Runner ---"
-          
+
           cd "$DEPLOY_PATH" || { echo "Error: Directory $DEPLOY_PATH not found."; exit 1; }
           echo "Changed to directory: $DEPLOY_PATH"
 
-          if [ "$BACKEND_CHANGED" = "true" ]; then
-            echo "Backend files changed. Pulling and restarting backend."
-            docker compose pull backend || { echo "Error: Failed to pull Backend Docker image."; exit 1; }
-            docker compose up -d backend || { echo "Error: Failed to restart Backend service."; exit 1; }
-          else
-            echo "Backend files not changed. Skipping backend update."
-          fi
-
-          if [ "$FRONTEND_CHANGED" = "true" ]; then
-            echo "Frontend files changed. Pulling and restarting frontend."
-            docker compose pull frontend || { echo "Error: Failed to pull Frontend Docker image."; exit 1; }
-            docker compose up -d frontend || { echo "Error: Failed to restart Frontend service."; exit 1; }
-          else
-            echo "Frontend files not changed. Skipping frontend update."
-          fi
+          docker-compose pull backend || { echo "Error: Failed to pull Backend Docker image."; exit 1; }
+          docker-compose up -d backend || { echo "Error: Failed to restart Backend service."; exit 1; }
 
           docker image prune -f
           echo "--- Deployment Complete ---"
