@@ -38,7 +38,8 @@ export class JoinerHandler implements IMessageHandler {
     }
     
     private validatePayload(payload: any): JoinerPayload | null {
-    
+        if (!payload || typeof payload !== 'object') return null;
+        if (!payload.action || !payload.roomId) return null;
         return payload as JoinerPayload;
     }
     
