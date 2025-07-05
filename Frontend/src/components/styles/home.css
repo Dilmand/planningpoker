@@ -1,19 +1,13 @@
 :host {
+    
 
-  --primary-color: #4f46e5;
-  --background: #f9fafb;
-    --card-bg: #ffffff;
-    --text-color: #111827;
-    --subtext-color: #6b7280;
-    --border-radius: 0.75rem;
-
-  display: block;
-  font-family: sans-serif;
-  background: var(--background);
-  color: var(--text-color);
-  padding: 1rem;
-  min-height: 100vh;
-  box-sizing: border-box;
+    display: block;
+    font-family: sans-serif;
+    background: var(--background);
+    color: var(--text-color);
+    padding: 1rem;
+    min-height: 100vh;
+    box-sizing: border-box;
 }
 
 *{

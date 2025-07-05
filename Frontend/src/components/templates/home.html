@@ -14,10 +14,12 @@
   <section>
     <article id="join-room">
       <h3>Join a Room</h3>
-      <form onsubmit="handleJoin(event)">
+      <p>Join a planning poker session</p>
+
+      <form>
         <input type="text" id="roomCode" placeholder="Enter Room Code (6 digits)" maxlength="6" />
         <input type="text" id="joinerName" placeholder="Enter Your Name" />
-        <button id="joinRoomButton">Join Room</button>
+        <button type="button" id="joinRoomButton">Join Room</button>
         <span id="join-error" class="error"></span>
       </form>
     </article>
@@ -25,10 +27,11 @@
     <article id="create-room">
       <h3>Create New Room</h3>
       <p>Start a new planning poker session for your team</p>
-      <form onsubmit="handleCreate(event)">
+
+      <form>
         <input type="text" id="roomName" placeholder="Enter Room Name" />
         <input type="text" id="facilitatorName" placeholder="Enter Your Name" />
-        <button id="createRoomButton">Create Room</button>
+        <button type="button" id="createRoomButton">Create Room</button>
         <span id="create-error" class="error"></span>
       </form>
     </article>

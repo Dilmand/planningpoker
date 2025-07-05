@@ -1,12 +1,10 @@
-/* Planning Poker Component Styles */
 :host {
-
-  --primary-color: #4f46e5;
-  --background: #f9fafb;
-  --card-bg: #a7a7a7;
-  --text-color: #111827;
-  --subtext-color: #6b7280;
-  --border-radius: 0.75rem;
+    --primary-color: #4f46e5;
+    --background: #f9fafb;
+    --card-bg: #ffffff;
+    --text-color: #111827;
+    --subtext-color: #6b7280;
+    --border-radius: 0.75rem;
 
 
   font-family: sans-serif;
