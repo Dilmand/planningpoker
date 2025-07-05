@@ -1,14 +1,12 @@
-name: Backend CI/CD
+name: CI/CD
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "Backend/**"
 
 jobs:
-  build-and-push-backend:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,7 +22,7 @@ jobs:
         id: git_sha
         run: echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Build and push Backend Docker image
+      - name: Build and push Docker images
         uses: docker/build-push-action@v5
         with:
           context: ./Backend
@@ -34,9 +32,19 @@ jobs:
             dilmand/planningpoker-backend:latest
             dilmand/planningpoker-backend:${{ steps.git_sha.outputs.SHA_SHORT }}
 
+      - name: Build and push Frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Frontend
+          file: ./Frontend/Dockerfile
+          push: true
+          tags: |
+            dilmand/planningpoker-frontend:latest
+            dilmand/planningpoker-frontend:${{ steps.git_sha.outputs.SHA_SHORT }}
+
   deploy:
     runs-on: self-hosted
-    needs: build-and-push-backend
+    needs: build-and-push
     steps:
       - name: Deploy to Self-Hosted Runner
         run: |
@@ -44,9 +52,9 @@ jobs:
 
           cd "$DEPLOY_PATH" || { echo "Error: Directory $DEPLOY_PATH not found."; exit 1; }
           echo "Changed to directory: $DEPLOY_PATH"
-
-          docker-compose pull backend || { echo "Error: Failed to pull Backend Docker image."; exit 1; }
-          docker-compose up -d backend || { echo "Error: Failed to restart Backend service."; exit 1; }
+          docker-compose pull || { echo "Error: Failed to pull Docker images."; exit 1; }
+          docker-compose down || { echo "Error: Failed to stop services."; exit 1; }
+          docker-compose up -d || { echo "Error: Failed to restart services."; exit 1; }
 
           docker image prune -f
           echo "--- Deployment Complete ---"
