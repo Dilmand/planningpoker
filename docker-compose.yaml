@@ -6,11 +6,9 @@ services:
       context: ./Backend
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
-    volumes:
-      - ./Backend:/app
-      - /app/node_modules
+      - "8699:8699"
     environment:
+      - PORT=8699
       - NODE_ENV=development
     restart: unless-stopped
     container_name: planning-poker-backend
@@ -20,11 +18,9 @@ services:
       context: ./Frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
-    volumes:
-      - ./Frontend:/app
-      - /app/node_modules
+      - "8600:80"
     depends_on:
       - backend
     restart: unless-stopped
     container_name: planning-poker-frontend
+

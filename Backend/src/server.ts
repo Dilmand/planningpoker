@@ -3,10 +3,10 @@ import { AdminHandler } from './handler/adminHandler';
 import { JoinerHandler } from './handler/joinerHandler';
 
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8699;
 
 async function main() {
-    const server = new WebSocketServer(PORT);
+    const server = new WebSocketServer(Number(PORT));
 
     server.registerMessageHandler('admin', new AdminHandler(server));
     server.registerMessageHandler('joiner', new JoinerHandler(server));
