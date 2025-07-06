@@ -12,17 +12,19 @@ export class WebSocketClient {
     private ws: WebSocket;
     private server: WebSocketServer;
     private clientName?: string;
+    private ip: string;
 
-    constructor(ws: WebSocket, server: WebSocketServer) {
+    constructor(ws: WebSocket, server: WebSocketServer, ip: string) {
         this.id = uuid();
         this.ws = ws;
         this.server = server;
+        this.ip = ip;
 
         this.ws.on('message', (message: string) => this.handleIncomingMessage(message));
         this.ws.on('close', (code: number, reason: string) => this.handleClose(code, reason));
         this.ws.on('error', (error: Error) => this.handleError(error));
 
-        console.log(`[Client ${this.id}] Connected.`);
+        console.log(`[Client ${this.id}] Connected from IP ${this.ip}.`);
     }
     
     public setClientName(name: string): void {
@@ -31,6 +33,10 @@ export class WebSocketClient {
     
     public getClientName(): string {
         return this.clientName || `Anonymous-${this.id.substring(0, 8)}`;
+    }
+
+    public getIP(): string {
+        return this.ip;
     }
 
     public async send<T extends IServerMessage>(message: T): Promise<void> {

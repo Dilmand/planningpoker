@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer as WSWebSocketServer } from 'ws';
 import { WebSocketClient } from './webSocketClient';
 import { IClientMessage } from './webSocketClient';
+import * as http from 'http';
 
 export interface IServerMessage {
     type: string;
@@ -22,13 +23,14 @@ export class WebSocketServer {
         this.clients = new Set<WebSocketClient>();
         this.messageHandlers = new Map<string, IMessageHandler>();
 
-        this.wss.on('connection', (ws: WebSocket) => this.handleNewConnection(ws));
+        this.wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => this.handleNewConnection(ws, req));
         this.wss.on('listening', () => console.log(`WebSocket server listening on port ${port}`));
         this.wss.on('error', (error: Error) => console.error('WebSocket server error:', error));
     }
 
-    private handleNewConnection(ws: WebSocket): void {
-        const client = new WebSocketClient(ws, this);
+    private handleNewConnection(ws: WebSocket, req: http.IncomingMessage): void {
+        const ip = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || '';
+        const client = new WebSocketClient(ws, this, ip);
         this.clients.add(client);
         console.log(`Client ${client.id} registered. Total clients: ${this.clients.size}`);
     }

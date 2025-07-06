@@ -7,7 +7,7 @@ interface Story {
     id: string;
     title?: string;
     description?: string;
-    votes: Map<string, Vote>; // clientId -> Vote
+    votes: Map<string, Vote>;
     revealed: boolean;
 }
 
@@ -18,11 +18,11 @@ interface Room {
     clients: Set<string>; // Set of clientIds
     stories: Map<string, Story>; // storyId -> Story
     currentStoryId?: string;
+    blockedIPs: Set<string>; // Set of blocked IP addresses
 }
 
 export class RoomManager {
     private rooms: Map<string, Room> = new Map(); // roomId -> Room
-    private blockedClients: Set<string> = new Set(); // Set of blocked clientIds
     static instance: RoomManager;
 
     constructor() {
@@ -40,16 +40,18 @@ export class RoomManager {
             roomName: roomName,
             clients: new Set([adminId]),
             stories: new Map(),
+            blockedIPs: new Set(),
         });
         console.log(`Room created: ${roomId} by admin ${adminId}`);
         return roomId;
     }
 
-    public joinRoom(roomId: string, clientId: string): boolean {
+    public joinRoom(roomId: string, clientId: string, clientIP?: string): boolean {
         const room = this.rooms.get(roomId);
         if (room) {
-            if (this.blockedClients.has(clientId)) {
-                console.warn(`Blocked client ${clientId} attempted to join room ${roomId}`);
+            // Check if client's IP is blocked in this room
+            if (clientIP && room.blockedIPs.has(clientIP)) {
+                console.warn(`Blocked IP ${clientIP} attempted to join room ${roomId}`);
                 return false;
             }
             room.clients.add(clientId);
@@ -97,9 +99,6 @@ export class RoomManager {
     }
 
     public blockClient(clientId: string): void {
-        this.blockedClients.add(clientId);
-        console.log(`Client ${clientId} has been blocked`);
-
         // Remove blocked client from all rooms
         this.rooms.forEach((room, roomId) => {
             if (room.clients.has(clientId)) {
@@ -222,5 +221,65 @@ export class RoomManager {
 
     public roomExists(roomId: string): boolean {
         return this.rooms.has(roomId);
+    }
+
+    public blockIPInRoom(roomId: string, ipAddress: string): boolean {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            console.error(`Room ${roomId} does not exist.`);
+            return false;
+        }
+
+        room.blockedIPs.add(ipAddress);
+        console.log(`IP ${ipAddress} blocked in room ${roomId}`);
+
+        // Remove all clients with this IP from the room
+        // Note: This would require tracking client IPs, which we'll need to implement
+        return true;
+    }
+
+    public unblockIPInRoom(roomId: string, ipAddress: string): boolean {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            console.error(`Room ${roomId} does not exist.`);
+            return false;
+        }
+
+        const wasBlocked = room.blockedIPs.has(ipAddress);
+        room.blockedIPs.delete(ipAddress);
+        
+        if (wasBlocked) {
+            console.log(`IP ${ipAddress} unblocked in room ${roomId}`);
+        }
+        
+        return wasBlocked;
+    }
+
+    public isIPBlockedInRoom(roomId: string, ipAddress: string): boolean {
+        const room = this.rooms.get(roomId);
+        return room ? room.blockedIPs.has(ipAddress) : false;
+    }
+
+    public getBlockedIPsInRoom(roomId: string): string[] {
+        const room = this.rooms.get(roomId);
+        return room ? Array.from(room.blockedIPs) : [];
+    }
+
+    public removeClientByIP(roomId: string, ipAddress: string, getClientById: (id: string) => { getIP(): string }): string[] {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            console.error(`Room ${roomId} does not exist.`);
+            return [];
+        }
+
+        const removedClientIds: string[] = [];
+        for (const clientId of Array.from(room.clients)) {
+            const client = getClientById(clientId);
+            if (client && client.getIP() === ipAddress) {
+                this.leaveRoom(roomId, clientId);
+                removedClientIds.push(clientId);
+            }
+        }
+        return removedClientIds;
     }
 }
