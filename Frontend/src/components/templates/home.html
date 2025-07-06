@@ -1,37 +1,39 @@
+<header>
+  <h1>Planning Poker</h1>
+</header>
+
+
 <main>
-<div class="create-room-form">
-  <h2>
-    Join a Room
-  </h2>
-  
-  <div class="form-group">
-    <label for="roomCode">Room Code</label>
-    <input type="text" id="roomCode" placeholder="Enter Room Code">
-  </div>
-  
-  <div class="form-group">
-    <label for="joinerName">Your Name</label>
-    <input type="text" id="joinerName" placeholder="Enter your name">
-  </div>
-  
-  <button id="joinRoomButton" class="create-button">Join Room</button>
-</div>
+  <h2>Agile Planning Made Simple</h2>
+  <p>
+    Estimate story points with your team using our intuitive planning poker tool.
+    Create rooms, invite teammates, and reach consensus faster.
+  </p>
 
-<div class="create-room-form">
-  <h2>
-    Create New Room
-  </h2>
 
-  <div class="form-group">
-    <label for="roomName">Room Name</label>
-    <input type="text" id="roomName" placeholder="Sprint Planning Session">
-  </div>
-  
-  <div class="form-group">
-    <label for="facilitatorName">Your Name</label>
-    <input type="text" id="facilitatorName" placeholder="Enter your name">
-  </div>
-  
-  <button id="createRoomButton" class="create-button">Create Room</button>
-</div>
+  <section>
+    <article id="join-room">
+      <h3>Join a Room</h3>
+      <p>Join a planning poker session</p>
+
+      <form>
+        <input type="text" id="roomCode" placeholder="Enter Room Code (6 digits)" maxlength="6" />
+        <input type="text" id="joinerName" placeholder="Enter Your Name" />
+        <button type="button" id="joinRoomButton">Join Room</button>
+        <span id="join-error" class="error"></span>
+      </form>
+    </article>
+
+    <article id="create-room">
+      <h3>Create New Room</h3>
+      <p>Start a new planning poker session for your team</p>
+
+      <form>
+        <input type="text" id="roomName" placeholder="Enter Room Name" />
+        <input type="text" id="facilitatorName" placeholder="Enter Your Name" />
+        <button type="button" id="createRoomButton">Create Room</button>
+        <span id="create-error" class="error"></span>
+      </form>
+    </article>
+  </section>
 </main>

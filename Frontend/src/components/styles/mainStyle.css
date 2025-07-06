@@ -1,8 +1,16 @@
-/* Planning Poker Component Styles */
 :host {
+    --primary-color: #4f46e5;
+    --background: #f9fafb;
+    --card-bg: #ffffff;
+    --text-color: #111827;
+    --subtext-color: #6b7280;
+    --border-radius: 0.75rem;
+
+
   font-family: sans-serif;
-  background: #f9fbfd;
-  color: #222;
+  background: var(--background);
+  color: var(--text-color);
+  padding: 1rem;
 }
 
 .layout {
@@ -132,47 +140,6 @@ aside li {
 aside select {
   width: 100%;
   padding: 0.3rem;
-}
-
-.create-room-form {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background-color: white;
-  border-radius: 5px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.create-button {
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s;
-}
-
-.create-button:hover {
-  background-color: #45a049;
 }
 
 .voting-area {

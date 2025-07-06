@@ -1,0 +1,129 @@
+:host {
+    
+
+    display: block;
+    font-family: sans-serif;
+    background: var(--background);
+    color: var(--text-color);
+    padding: 1rem;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+*{
+    box-sizing: border-box;
+    margin: 0;
+  }
+
+
+  header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  }
+
+  header h1 {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+
+  header h1::before {
+    content: '▶';
+    margin-right: 0.5rem;
+    color: var(--primary-color);
+  }
+
+  main {
+    max-width: 900px;
+    margin: auto;
+    text-align: center;
+  }
+
+  main h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  main p {
+    color: var(--subtext-color);
+    font-size: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+
+  article {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    text-align: left;
+  }
+
+  article h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  article p {
+    color: var(--subtext-color);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  input[type='text'] {
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+    font-size: 1rem;
+  }
+
+  input[type='text']:focus {
+    outline: 2px solid var(--primary-color);
+  }
+
+  button {
+    padding: 0.6rem;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  button:hover {
+    background-color: #4338ca;
+  }
+
+  .error {
+    color: #dc2626;
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 600px) {
+    header {
+      justify-content: center;
+    }
+
+    main h2 {
+      font-size: 1.5rem;
+    }
+  }
