@@ -1,4 +1,58 @@
-<main>
+handleNotification(payload, ws) {
+  console.log('Notification received:', payload);
+
+  switch (payload.action) {
+    case 'userJoined':
+      this.showToast(`${payload.userName} joined the room`);
+
+      const playersSectionJoin = this.shadowRoot.getElementById('playersSection');
+      if (playersSectionJoin) {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player';
+        playerDiv.dataset.value = '?';
+        playerDiv.dataset.userId = payload.userId;
+
+        const img = document.createElement('img');
+        const existingCount = playersSectionJoin.children.length;
+        img.src = `avatare/avatar_${existingCount + 1}.jpeg`;
+        img.alt = payload.userName;
+
+        playerDiv.appendChild(img);
+
+        const span = document.createElement('span');
+        span.innerText = payload.userName;
+        playerDiv.appendChild(span);
+
+        playersSectionJoin.appendChild(playerDiv);
+      }
+      break;
+
+    case 'userLeft':
+      this.showToast(`${payload.userName} left the room`);
+
+      // Spieler-UI im Spielerbereich entfernen
+      const playersSectionLeave = this.shadowRoot.getElementById('playersSection');
+      if (playersSectionLeave) {
+        const leftPlayer = playersSectionLeave.querySelector(`.player[data-user-id="${payload.userId}"]`);
+        if (leftPlayer) {
+          leftPlayer.remove();
+        }
+      }
+
+      // Teilnehmerliste entfernen (nur Admin-Rooms)
+      const participantsList = this.shadowRoot.getElementById('participantsList');
+      if (participantsList) {
+        const departedUserElement = participantsList.querySelector(`li[data-user-id="${payload.userId}"]`);
+        if (departedUserElement) {
+          departedUserElement.remove();
+        }
+      }
+      break;
+
+    default:
+      console.log('Unknown notification action:', payload.action);
+  }
+}<main>
   <header>
     <h1>{{roomName}}</h1>
   </header>
