@@ -1,0 +1,27 @@
+name: Pull Request Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  test:
+    name: Run Server Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        working-directory: Backend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: Backend
+        run: npm test
