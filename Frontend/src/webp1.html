@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planning Poker Integration Test</title>
+    <style>
+        /* Reset & base typography */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: system-ui, sans-serif;
+            line-height: 1.6;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        /* Layout */
+        header,
+        footer {
+            background: #fff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 1rem;
+            margin-top: .5rem;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #007acc;
+            font-weight: 500;
+        }
+
+        main {
+            padding: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            margin-bottom: .75rem;
+            font-size: 1.5rem;
+        }
+
+        .section p {
+            margin-bottom: .5rem;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+
+        .feature {
+            background: #fff;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .feature h3 {
+            margin-bottom: .5rem;
+            font-size: 1.25rem;
+        }
+
+        /* Card for the component */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        planning-poker {
+            display: block;
+            width: 100%;
+            height: 500px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow: auto;
+        }
+
+        planning-poker:not(:defined) {
+            color: #a00;
+            font-style: italic;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        footer p {
+            text-align: center;
+            font-size: .9rem;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>My Agile Toolkit</h1>
+        <nav>
+            <ul>
+                <li><a href="#">Home</a></li>
+                <li><a href="#">Docs</a></li>
+                <li><a href="#">API</a></li>
+                <li><a href="#">Support</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="section">
+            <h2>Welcome!</h2>
+            <p>
+                This page is designed to help you evaluate the new Planning Poker web component. Scroll down to interact
+                with it,
+                or read on to see how it behaves in a typical content-heavy layout.
+            </p>
+        </section>
+
+        <section class="section features">
+            <div class="feature">
+                <h3>Feature 1: Real‑Time Sync</h3>
+                <p>All connected users see updates instantly, powered by WebSockets.</p>
+            </div>
+            <div class="feature">
+                <h3>Feature 2: Custom Decks</h3>
+                <p>Load Fibonacci, T‑shirt sizes, or your own scoring schemes.</p>
+            </div>
+            <div class="feature">
+                <h3>Feature 3: Mobile‑Friendly</h3>
+                <p>Responsive design ensures smooth play on tablets and phones.</p>
+            </div>
+            <div class="feature">
+                <h3>Feature 4: Dark Mode</h3>
+                <p>Automatically adapts to user preference or system settings.</p>
+            </div>
+        </section>
+
+        <div class="card">
+            <h2 style="text-align:center; margin-bottom:1rem;">Planning Poker Demo</h2>
+            <script type="module" src="components/planning-poker.js"></script>
+            <planning-poker ws-url="ws://localhost:8699">
+                <!-- fallback content -->
+                Your browser doesn’t support the Planning Poker component.
+            </planning-poker>
+        </div>
+
+        <section class="section">
+            <h2>Usage Notes</h2>
+            <p>
+                You can embed this component anywhere: dashboards, wiki pages, or internal tools. It exposes a simple
+                API for
+                programmatic control, and emits custom DOM events for every vote and reveal action.
+            </p>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2025 Mocked Webpage</p>
+    </footer>
+</body>
+
+</html>
