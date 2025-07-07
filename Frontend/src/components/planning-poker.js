@@ -1,23 +1,23 @@
+import { MessageHandler } from './message-handler.js';
+import { WebSocketManager, CLIENT_ROLES } from './websocket-manager.js';
+
 class PlanningPoker extends HTMLElement {
   constructor() {
     super();
     this.loadedStyles = new Set();
     this.attachShadow({ mode: "open" });
 
-    // Bind methods
-    this.handleNotification       = this.handleNotification.bind(this);
+    this.messageHandler = new MessageHandler(this);
+    this.wsManager = new WebSocketManager(this, this.messageHandler);
+
     this.showToast                = this.showToast.bind(this);
     this.loadTemplate             = this.loadTemplate.bind(this);
     this.renderPage               = this.renderPage.bind(this);
     this._setupHomePageListeners  = this._setupHomePageListeners.bind(this);
     this._handleJoinRoom          = this._handleJoinRoom.bind(this);
     this._handleCreateRoom        = this._handleCreateRoom.bind(this);
-    this._setupWebSocketListeners = this._setupWebSocketListeners.bind(this);
-    this._handleSuccessMessage    = this._handleSuccessMessage.bind(this);
     this._renderJoinerRoom        = this._renderJoinerRoom.bind(this);
     this._renderAdminRoom         = this._renderAdminRoom.bind(this);
-
-    // initial loading indicator
     this.shadowRoot.innerHTML = '<div>Loading...</div>';
   }
 
@@ -32,9 +32,6 @@ class PlanningPoker extends HTMLElement {
     }
   }
 
-  /** 
-   * Centralized: fetch template, render, load main + template CSS 
-   */
   async renderPage(templateName, data = {}) {
     const html = await this.loadTemplate(templateName);
     this.shadowRoot.innerHTML = this.renderTemplate(html, data);
@@ -87,7 +84,6 @@ class PlanningPoker extends HTMLElement {
     );
   }
 
-  // --- Home page setup ---
   _setupHomePageListeners(wsURL) {
     this.shadowRoot.getElementById("joinRoomButton")
       .addEventListener("click", () => this._handleJoinRoom(wsURL));
@@ -98,300 +94,249 @@ class PlanningPoker extends HTMLElement {
   async _handleJoinRoom(wsURL) {
     const roomId   = this.shadowRoot.getElementById("roomCode").value;
     const userName = this.shadowRoot.getElementById("joinerName").value;
+    
     if (!roomId || !userName) {
       this.showToast("Please enter a room code and your name.");
       return;
     }
+
     this.showToast("Joining room...");
-    const ws = new WebSocket(wsURL);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        type: "joiner",
-        payload: { action: "joinRoom", roomId, userName }
-      }));
-    };
-    this._setupWebSocketListeners(ws, 'joiner');
+    
+    try {
+      await this.wsManager.connect(wsURL, CLIENT_ROLES.JOINER);
+      this.wsManager.joinRoom(roomId, userName);
+    } catch (error) {
+      console.error("Failed to connect or join room:", error);
+      this.showToast("Failed to connect to server");
+    }
   }
 
   async _handleCreateRoom(wsURL) {
     const roomName = this.shadowRoot.getElementById("roomName").value;
     const userName = this.shadowRoot.getElementById("facilitatorName").value;
+    
     if (!roomName || !userName) {
       this.showToast("Please enter a room name and your name.");
       return;
     }
+
     this.showToast("Creating room...");
-    const ws = new WebSocket(wsURL);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        type: "admin",
-        payload: { action: "createRoom", roomName, userName }
-      }));
-    };
-    this._setupWebSocketListeners(ws, 'admin');
-  }
-
-  // --- WebSocket listeners ---
-  _setupWebSocketListeners(ws, role) {
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "error") {
-        const msg = typeof data.payload === 'string'
-                  ? data.payload
-                  : 'An error occurred';
-        this.showToast(`Error: ${msg}`);
-        console.error("Error payload:", data.payload);
-      } else if (data.type === "notification") {
-        this.handleNotification(data.payload, ws);
-      } else if (data.type === "success") {
-        this._handleSuccessMessage(data.payload, ws, role);
-      } else {
-        console.log("Unknown WS message type:", data.type);
-      }
-    };
-    ws.onclose = () => {
-      this.showToast("Disconnected from room.");
-    };
-    ws.onerror = (e) => {
-      console.error("WebSocket error:", e);
-      this.showToast("WebSocket connection error.");
-    };
-  }
-
-  async _handleSuccessMessage(payload, ws, role) {
-    switch (payload.action) {
-      case "joinRoom":
-        await this._renderJoinerRoom(payload, ws);
-        break;
-      case "createRoom":
-        await this._renderAdminRoom(payload, ws);
-        break;
-      case "vote":
-        this.showToast(`Vote recorded: ${payload.voteValue}`);
-        break;
-      case "revealCards":
-        this.showToast("Cards revealed!");
-        break;
-      case "leaveRoom":
-        this.showToast("You left the room.");
-        ws.close();
-        window.location.reload();
-        break;
-      default:
-        console.log("Unknown success action:", payload.action);
+    
+    try {
+      await this.wsManager.connect(wsURL, CLIENT_ROLES.ADMIN);
+      this.wsManager.createRoom(roomName, userName);
+    } catch (error) {
+      console.error("Failed to connect or create room:", error);
+      this.showToast("Failed to connect to server");
     }
   }
 
-  // --- Joiner view ---
-  async _renderJoinerRoom(payload, ws) {
+  async _renderJoinerRoom(payload) {
     await this.renderPage('joiner-room', {
       roomId:   payload.roomId,
       roomName: payload.roomName || ''
     });
 
-    // populate players
+    this.wsManager.currentRoom = payload.roomId;
+
     const playersSection = this.shadowRoot.getElementById('playersSection');
-    if (playersSection && payload.players) {
+    if (playersSection && payload.participants) {
       playersSection.innerHTML = '';
-      payload.players.forEach((player, i) => {
+      payload.participants.forEach((participant, i) => {
         const div = document.createElement('div');
         div.className = 'player';
-        div.dataset.value = player.value || '?';
-        if (player.isOwn) div.dataset.own = 'true';
+        div.dataset.value = '?';
+        div.dataset.userId = participant.userId;
+        if (participant.userName === payload.userName) div.dataset.own = 'true';
 
         const img = document.createElement('img');
         img.src = `avatare/avatar_${i+1}.jpeg`;
-        img.alt = player.userName;
+        img.alt = participant.userName;
         div.appendChild(img);
 
+        // Add empty vote card next to avatar
+        const voteCard = document.createElement('div');
+        voteCard.className = 'vote-card';
+        voteCard.style.cssText = `
+          width: 30px;
+          height: 40px;
+          border: 2px solid #ddd;
+          border-radius: 5px;
+          background: white;
+          margin: 0 5px;
+          transition: background-color 0.3s ease;
+        `;
+        div.appendChild(voteCard);
+
         const span = document.createElement('span');
-        span.textContent = player.userName;
+        span.textContent = participant.userName;
         div.appendChild(span);
 
         playersSection.appendChild(div);
       });
     }
 
-    // card selection
     this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
       btn.addEventListener('click', () => {
         this.shadowRoot.querySelectorAll('.card-select button')
           .forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
+        
         const voteValue = btn.dataset.value;
         const own = this.shadowRoot.querySelector('.player[data-own="true"]');
-        if (own) own.dataset.value = voteValue;
-        ws.send(JSON.stringify({
-          type:    "joiner",
-          payload: { action: "vote", roomId: payload.roomId, voteValue, storyId: "current" }
-        }));
+        if (own) {
+          own.dataset.value = voteValue;
+          // Update own vote card color
+          const ownVoteCard = own.querySelector('.vote-card');
+          if (ownVoteCard) {
+            ownVoteCard.style.backgroundColor = '#4285f4';
+            ownVoteCard.style.borderColor = '#4285f4';
+          }
+        }
+        
+        this.wsManager.vote(voteValue);
       });
     });
 
     this.shadowRoot.getElementById('leaveRoomButton')
       .addEventListener('click', () => {
-        ws.send(JSON.stringify({
-          type:    "joiner",
-          payload: { action: "leaveRoom", roomId: payload.roomId }
-        }));
+        this.wsManager.leaveRoom();
       });
   }
 
-  // --- Admin view ---
-  async _renderAdminRoom(payload, ws) {
+  async _renderAdminRoom(payload) {
     await this.renderPage('admin-room', {
       roomId:   payload.roomId,
       roomName: payload.roomName
     });
 
-    // populate players
+    this.wsManager.currentRoom = payload.roomId;
+
     const playersSection = this.shadowRoot.getElementById('playersSection');
-    if (playersSection && payload.players) {
+    if (playersSection && payload.participants) {
       playersSection.innerHTML = '';
-      payload.players.forEach((player, i) => {
+      payload.participants.forEach((participant, i) => {
         const div = document.createElement('div');
         div.className = 'player';
-        div.dataset.value = player.value || '?';
-        if (player.isOwn) div.dataset.own = 'true';
+        div.dataset.value = '?';
+        div.dataset.userId = participant.userId;
+        if (participant.userName === payload.userName) div.dataset.own = 'true';
 
         const img = document.createElement('img');
         img.src = `avatare/avatar_${i+1}.jpeg`;
-        img.alt = player.userName;
+        img.alt = participant.userName;
         div.appendChild(img);
 
+        // Add empty vote card next to avatar
+        const voteCard = document.createElement('div');
+        voteCard.className = 'vote-card';
+        voteCard.style.cssText = `
+          width: 30px;
+          height: 40px;
+          border: 2px solid #ddd;
+          border-radius: 5px;
+          background: white;
+          margin: 0 5px;
+          transition: background-color 0.3s ease;
+        `;
+        div.appendChild(voteCard);
+
         const span = document.createElement('span');
-        span.textContent = player.userName;
+        span.textContent = participant.userName;
         div.appendChild(span);
 
         playersSection.appendChild(div);
       });
     }
 
-    // voting buttons
     this.shadowRoot.querySelectorAll('.card-select button').forEach(btn => {
       btn.addEventListener('click', () => {
         this.shadowRoot.querySelectorAll('.card-select button')
           .forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
+        
         const voteValue = btn.dataset.value;
         const own = this.shadowRoot.querySelector('.player[data-own="true"]');
-        if (own) own.dataset.value = voteValue;
-        ws.send(JSON.stringify({
-          type:    "admin",
-          payload: { action: "vote", roomId: payload.roomId, voteValue, storyId: "current" }
-        }));
+        if (own) {
+          own.dataset.value = voteValue;
+          // Update own vote card color
+          const ownVoteCard = own.querySelector('.vote-card');
+          if (ownVoteCard) {
+            ownVoteCard.style.backgroundColor = '#4285f4';
+            ownVoteCard.style.borderColor = '#4285f4';
+          }
+        }
+        
+        this.wsManager.vote(voteValue);
       });
     });
 
-    // reveal cards
     this.shadowRoot.getElementById('revealCardsButton')
       .addEventListener('click', () => {
-        ws.send(JSON.stringify({
-          type:    "admin",
-          payload: { action: "revealCards", roomId: payload.roomId, storyId: "current" }
-        }));
-        const players = this.shadowRoot.querySelectorAll('.player');
-        const values = [];
-        players.forEach(p => {
-          const v = p.dataset.value;
-          const num = parseInt(v);
-          // remove avatar
-          const img = p.querySelector('img');
-          if (img) img.remove();
-          // show card value
-          const card = document.createElement('div');
-          card.className = 'card-value';
-          card.innerText = isNaN(num) ? '?' : v;
-          p.insertBefore(card, p.querySelector('span'));
-          if (!isNaN(num)) values.push(num);
-        });
-        const avg = values.length
-                  ? (values.reduce((a,b)=>a+b,0)/values.length).toFixed(1)
-                  : '?';
-        const avgDisplay = this.shadowRoot.querySelector('.average-display');
-        if (avgDisplay) avgDisplay.textContent = avg;
+        this.wsManager.revealCards();
       });
 
-    // reset
     this.shadowRoot.querySelector('.reset')
       .addEventListener('click', () => {
-        this._renderAdminRoom(payload, ws);
+        this._renderAdminRoom(payload);
       });
 
-    // leave
     this.shadowRoot.getElementById('leaveAdminRoomButton')
       .addEventListener('click', () => {
-        ws.send(JSON.stringify({
-          type:    "admin",
-          payload: { action: "leaveRoom", roomId: payload.roomId }
-        }));
+        this.wsManager.leaveRoom();
       });
 
-    // manage participants
-    const participantsList = this.shadowRoot.getElementById('participantsList');
-    if (participantsList && payload.participants) {
-      participantsList.innerHTML = '';
-      payload.participants.forEach(part => {
-        const li = document.createElement('li');
-        li.dataset.userId = part.userId;
-        li.textContent = part.userName + ' ';
-        const status = document.createElement('span');
-        status.textContent = part.blocked ? '🚫' : '✅';
-        li.appendChild(status);
-
-        const sel = document.createElement('select');
-        sel.innerHTML = `
-          <option>Aktion wählen</option>
-          <option>User blockieren</option>
-          <option>User entblockieren</option>
-        `;
-        sel.addEventListener('change', () => {
-          if (sel.value === 'User blockieren') {
-            status.textContent = '🚫';
-            ws.send(JSON.stringify({
-              type:    "admin",
-              payload: { action: "blockUser", roomId: payload.roomId, targetClientId: part.userId }
-            }));
-          } else if (sel.value === 'User entblockieren') {
-            status.textContent = '✅';
-            ws.send(JSON.stringify({
-              type:    "admin",
-              payload: { action: "unblockUser", roomId: payload.roomId, targetClientId: part.userId }
-            }));
-          }
-          sel.value = 'Aktion wählen';
-        });
-        li.appendChild(sel);
-        participantsList.appendChild(li);
-      });
-    }
+    this._setupParticipantManagement(payload.participants);
   }
 
-  // --- Notifications & toasts ---
-  handleNotification(payload) {
-    switch (payload.action) {
-      case 'userJoined':
-        this.showToast(`${payload.userName} joined the room`);
-        {
-          const ul = this.shadowRoot.getElementById('participantsList');
-          if (ul) {
-            const li = document.createElement('li');
-            li.dataset.userId = payload.userId;
-            li.textContent   = payload.userName;
-            ul.appendChild(li);
-          }
-        }
-        break;
-      case 'userLeft':
-        this.showToast(`${payload.userName} left the room`);
-        {
-          const el = this.shadowRoot.querySelector(`li[data-user-id="${payload.userId}"]`);
-          if (el) el.remove();
-        }
-        break;
-      default:
-        console.log('Unknown notification:', payload);
-    }
+  _setupParticipantManagement(participants) {
+    const participantsList = this.shadowRoot.getElementById('participantsList');
+    if (!participantsList || !participants) return;
+
+    participantsList.innerHTML = '';
+    participants.forEach(participant => {
+      const li = this._createParticipantElement(participant);
+      participantsList.appendChild(li);
+    });
+  }
+
+  _createParticipantElement(participant) {
+    const li = document.createElement('li');
+    li.dataset.userId = participant.userId;
+    li.textContent = participant.userName + ' ';
+    
+    const status = document.createElement('span');
+    status.textContent = participant.blocked ? '🚫' : '✅';
+    li.appendChild(status);
+
+    const actionSelect = this._createParticipantActionSelect(participant);
+    li.appendChild(actionSelect);
+    
+    return li;
+  }
+
+  _createParticipantActionSelect(participant) {
+    const select = document.createElement('select');
+    select.innerHTML = `
+      <option>Aktion wählen</option>
+      <option value="block">User blockieren</option>
+      <option value="unblock">User entblockieren</option>
+    `;
+    
+    select.addEventListener('change', () => {
+      const action = select.value;
+      const status = select.parentElement.querySelector('span');
+      
+      if (action === 'block') {
+        this.wsManager.blockUser(participant.userId);
+      } else if (action === 'unblock') {
+        this.wsManager.unblockUser(participant.userId);
+      }
+      
+      select.value = 'Aktion wählen';
+    });
+    
+    return select;
   }
 
   showToast(message) {
@@ -417,6 +362,12 @@ class PlanningPoker extends HTMLElement {
     toast.textContent = message;
     toast.style.opacity = '1';
     setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+  }
+
+  disconnectedCallback() {
+    if (this.wsManager) {
+      this.wsManager.disconnect();
+    }
   }
 }
 
