@@ -44,6 +44,17 @@ class PlanningPoker extends HTMLElement {
       });
     }
 
+
+    const toggleBtn = this.shadowRoot.getElementById('toggleSidebarBtn');
+    const sidebar = this.shadowRoot.querySelector('aside.admin-only');
+
+    if (toggleBtn && sidebar) {
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+      });
+    }
+
+
   }
 
   async loadMainStyles() {
@@ -312,17 +323,25 @@ class PlanningPoker extends HTMLElement {
   _createParticipantElement(participant) {
     const li = document.createElement('li');
     li.dataset.userId = participant.userId;
-    li.textContent = participant.userName + ' ';
-    
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'participant-name';
+    nameSpan.textContent = participant.userName;
+
     const status = document.createElement('span');
+    status.className = 'participant-status';
     status.textContent = participant.blocked ? '🚫' : '✅';
-    li.appendChild(status);
 
     const actionSelect = this._createParticipantActionSelect(participant);
+    actionSelect.className = 'participant-select';
+
+    li.appendChild(nameSpan);
+    li.appendChild(status);
     li.appendChild(actionSelect);
-    
+
     return li;
   }
+
 
   _createParticipantActionSelect(participant) {
     const select = document.createElement('select');

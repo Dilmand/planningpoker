@@ -213,9 +213,12 @@ aside select {
   margin-top: 2rem;
 }
 
-#participantsList {
-  list-style-type: none;
-  padding: 0;
+#participantsList li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid #eee;
 }
 
 #participantsList li {
@@ -235,4 +238,58 @@ aside select {
   z-index: 1000;
   opacity: 0;
   transition: opacity 0.3s ease;
+}
+
+
+.participant-name {
+  flex-shrink: 0;
+  min-width: 100px;
+  text-align: left;
+}
+
+.participant-status {
+  width: 20px;
+  text-align: center;
+}
+
+.participant-select {
+  margin-left: 8px;
+}
+
+
+.sidebar-toggle {
+  display: none;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: #333;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  z-index: 1001;
+  cursor: pointer;
+}
+
+@media (max-width: 800px) {
+  aside.admin-only {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 300px;
+    background: white;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    padding: 20px;
+    z-index: 1000;
+  }
+
+  aside.admin-only.open {
+    display: block;
+  }
+
+  .sidebar-toggle {
+    display: inline-block;
+  }
 }
