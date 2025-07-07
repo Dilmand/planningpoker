@@ -1,5 +1,8 @@
 <div class="layout">
   <main>
+
+    <button id="toggleSidebarBtn" class="sidebar-toggle admin-only">☰ Participants</button>
+
     <header>
       <p class="room-code">Room Code: <strong>{{roomId}}</strong></p>
       <h1>{{roomName}}</h1>
@@ -22,13 +25,15 @@
         <button data-value="13">13</button>
       </nav>
       <div class="control-buttons">
-        <button id="revealCardsButton" class="reveal reveal-below">Reveal cards</button>
-        <button class="reset">Reset cards</button>
+        <!-- Diese beiden Buttons sieht nur der Admin -->
+        <button id="revealCardsButton" class="reveal reveal-below admin-only">Reveal cards</button>
+        <button class="reset admin-only">Reset cards</button>
+        <!-- Dieser Button bleibt unverändert -->
         <button id="leaveAdminRoomButton" class="leave-room">Leave Room</button>
       </div>
     </footer>
   </main>
-  <aside>
+  <aside class="admin-only">
     <h2>All Participants</h2>
     <p>View and manage all users within the room</p>
     <ul id="participantsList">

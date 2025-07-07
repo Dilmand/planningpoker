@@ -37,6 +37,24 @@ class PlanningPoker extends HTMLElement {
     this.shadowRoot.innerHTML = this.renderTemplate(html, data);
     await this.loadMainStyles();
     await this.loadTemplateStyles(templateName);
+
+    if (data.isAdmin === false) {
+      this.shadowRoot.querySelectorAll('.admin-only').forEach(el => {
+        el.remove(); // entfernt das ganze Element vollständig aus dem DOM
+      });
+    }
+
+
+    const toggleBtn = this.shadowRoot.getElementById('toggleSidebarBtn');
+    const sidebar = this.shadowRoot.querySelector('aside.admin-only');
+
+    if (toggleBtn && sidebar) {
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+      });
+    }
+
+
   }
 
   async loadMainStyles() {
@@ -132,9 +150,10 @@ class PlanningPoker extends HTMLElement {
   }
 
   async _renderJoinerRoom(payload) {
-    await this.renderPage('joiner-room', {
+    await this.renderPage('room', {
       roomId:   payload.roomId,
-      roomName: payload.roomName || ''
+      roomName: payload.roomName || '',
+      isAdmin: false
     });
 
     this.wsManager.currentRoom = payload.roomId;
@@ -205,9 +224,10 @@ class PlanningPoker extends HTMLElement {
   }
 
   async _renderAdminRoom(payload) {
-    await this.renderPage('admin-room', {
+    await this.renderPage('room', {
       roomId:   payload.roomId,
-      roomName: payload.roomName
+      roomName: payload.roomName,
+      isAdmin: true
     });
 
     this.wsManager.currentRoom = payload.roomId;
@@ -303,17 +323,25 @@ class PlanningPoker extends HTMLElement {
   _createParticipantElement(participant) {
     const li = document.createElement('li');
     li.dataset.userId = participant.userId;
-    li.textContent = participant.userName + ' ';
-    
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'participant-name';
+    nameSpan.textContent = participant.userName;
+
     const status = document.createElement('span');
+    status.className = 'participant-status';
     status.textContent = participant.blocked ? '🚫' : '✅';
-    li.appendChild(status);
 
     const actionSelect = this._createParticipantActionSelect(participant);
+    actionSelect.className = 'participant-select';
+
+    li.appendChild(nameSpan);
+    li.appendChild(status);
     li.appendChild(actionSelect);
-    
+
     return li;
   }
+
 
   _createParticipantActionSelect(participant) {
     const select = document.createElement('select');
