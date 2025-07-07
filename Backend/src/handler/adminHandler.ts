@@ -1,353 +1,235 @@
-import { WebSocketClient } from "../core/webSocketClient";
-import { BaseHandler, BasePayload } from "./baseHandler";
+import { WebSocketClient } from '../core/webSocketClient';
+import { IMessageHandler } from '../core/webSocketServer';
+import { RoomManager } from '../core/roomManager';
+import { WebSocketServer } from '../core/webSocketServer';
 
-export interface AdminPayload extends BasePayload {
-    action:
-        | "createRoom"
-        | "removeRoom"
-        | "blockUser"
-        | "unblockUser"
-        | "getBlockedUsers"
-        | "vote"
-        | "revealCards"
-        | "leaveRoom";
+export interface AdminPayload {
+    action: 'createRoom' | 'removeRoom' | 'blockUser' | 'vote' | 'revealCards' | 'leaveRoom' | 'unblockUser';
+    roomId?: string;
+    roomName?: string;
+    userName?: string;
     targetClientId?: string;
+    voteValue?: string;
+    storyId?: string;
+    ip?: string;
 }
 
-export class AdminHandler extends BaseHandler {
-    async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
-        const handlerType = this.getHandlerType();
-        console.log(
-            `${handlerType} action received from client ${client.id}:`,
-            receivedPayload,
-        );
+export class AdminHandler implements IMessageHandler {
+    private roomManager: RoomManager;
+    private webSocketServer: WebSocketServer;
 
-        await this.processMessage(client, receivedPayload, handlerType);
+    constructor(webSocketServer: WebSocketServer) {
+        this.roomManager = new RoomManager();
+        this.webSocketServer = webSocketServer;
     }
 
-    protected async processMessage(
-        client: WebSocketClient,
-        receivedPayload: any,
-        handlerType: string,
-    ): Promise<void> {
+    async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
+        console.log(`Admin action received from client ${client.id}:`, receivedPayload);
+
         try {
             const payload = this.validatePayload(receivedPayload);
             if (!payload) {
-                await this.sendError(
-                    client,
-                    `Invalid ${handlerType} payload. Required fields: action, roomId`,
-                );
+                await this.send(client, "error", 'Invalid admin payload. Required fields: action, roomId');
                 return;
             }
 
-            await this.processAction(client, payload);
+            await this.processAdminAction(client, payload);
         } catch (error: any) {
-            await this.sendError(
-                client,
-                `Error processing ${handlerType} action: ${error.message}`,
-            );
+            await this.send(client, "error", `Error processing admin action: ${error.message}`);
         }
     }
 
-    protected getHandlerType(): string {
-        return "admin";
-    }
-
-    protected async processAction(
-        client: WebSocketClient,
-        payload: any,
-    ): Promise<void> {
-        await this.processAdminAction(client, payload as AdminPayload);
-    }
-
-    private async processAdminAction(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        // Validate that the client is the admin of the room for all actions except createRoom
-        if (payload.action !== "createRoom" && payload.roomId) {
-            if (!this.roomManager.isAdmin(payload.roomId, client.id)) {
-                await this.sendError(
-                    client,
-                    "Only the admin of this room can execute admin commands",
-                );
-                console.log(
-                    `Unauthorized admin action attempt: Client ${client.id} (${client.getClientName()}) tried to execute ${payload.action} in room ${payload.roomId}`,
-                );
-                return;
-            }
+    private validatePayload(payload: any): AdminPayload | null {
+        if (!payload) {
+            return null;
         }
+        return payload as AdminPayload;
+    }
 
-        const actionHandlers: Record<
-            AdminPayload["action"],
-            (client: WebSocketClient, payload: AdminPayload) => Promise<void>
-        > = {
-            "createRoom": this.processCreateRoom.bind(this),
-            "removeRoom": this.processRemoveRoom.bind(this),
-            "blockUser": this.processBlockUser.bind(this),
-            "unblockUser": this.processUnblockUser.bind(this),
-            "getBlockedUsers": this.processGetBlockedUsers.bind(this),
-            "vote": this.processVote.bind(this),
-            "revealCards": this.processRevealCards.bind(this),
-            "leaveRoom": this.processLeaveRoom.bind(this),
+    private async processAdminAction(client: WebSocketClient, payload: AdminPayload): Promise<void> {
+        const actionHandlers: Record<AdminPayload["action"], () => Promise<void>> = {
+            'createRoom': async () => {
+                if (!payload.userName) {
+                    console.log(`User name is required for create room action from client ${client.id}`);
+                    await this.send(client, "error", 'User name is required for create room action');
+                    return;
+                }
+                if (!payload.roomName) {
+                    console.log(`Room name is required for create room action from client ${client.id}`);
+                    await this.send(client, "error", 'Room name is required for create room action');
+                    return;
+                }
+                client.setClientName(payload.userName);
+                const roomId = this.roomManager.createRoom(client.id, payload.roomName);
+                
+                // Get all clients in the room (should just be the admin at this point)
+                const allClientsInRoom = this.roomManager.getClientsInRoom(roomId);
+                
+                // Get participant details
+                const participants = [];
+                for (const clientId of allClientsInRoom) {
+                    const clientObj = this.webSocketServer.getClient(clientId);
+                    if (clientObj) {
+                        participants.push({
+                            userId: clientId,
+                            userName: clientObj.getClientName(),
+                            isAdmin: this.roomManager.isAdmin(roomId, clientId)
+                        });
+                    }
+                }
+                
+                await this.send(client, "success", {
+                    action: "createRoom",
+                    roomId: roomId,
+                    roomName: payload.roomName,
+                    participants: participants
+                });
+            },
+            'removeRoom': async () => {
+                if (!payload.targetClientId) {
+                    await this.send(client, "error", 'Target client ID is required for remove action');
+                    return;
+                }
+
+                if (!payload.roomId) {
+                    await this.send(client, "error", 'Room ID is required for remove action');
+                    return;
+                }
+
+                if (!this.roomManager.roomExists(payload.roomId)) {
+                    await this.send(client, "error", `Room ${payload.roomId} does not exist`);
+                    return;
+                }
+
+                this.roomManager.leaveRoom(payload.roomId, payload.targetClientId);
+                await this.send(client, "success", {
+                    action: "removeRoom",
+                    roomId: payload.roomId,
+                    targetClientId: payload.targetClientId
+                });
+            },
+            'blockUser': async () => {
+                if (!payload.targetClientId) {
+                    await this.send(client, "error", 'Target client ID is required for block action');
+                    return;
+                }
+
+                const targetClient = this.webSocketServer.getClient(payload.targetClientId);
+                if (!targetClient) {
+                    await this.send(client, "error", `Client ${payload.targetClientId} does not exist`);
+                    return;
+                }
+
+                const ip = targetClient.getIP();
+                this.webSocketServer.blockIP(ip);
+
+                // Get the room ID of the target client (if applicable)
+                const roomId = this.roomManager.getRoomIdByClientId(payload.targetClientId);
+                if (roomId) {
+                    const allClientsInRoom = this.roomManager.getClientsInRoom(roomId);
+
+                    // Broadcast the userKicked event to all clients in the room
+                    this.webSocketServer.broadcast(allClientsInRoom, {
+                        type: 'notification',
+                        payload: {
+                            action: 'userBlocked',
+                            roomId: roomId,
+                            userId: payload.targetClientId,
+                            userName: targetClient.getClientName(),
+                            reason: 'Blocked by admin'
+                        }
+                    });
+                }
+
+                targetClient.close(); // Close the connection of the kicked user
+
+                await this.send(client, "success", {
+                    action: "blockUser",
+                    targetClientId: payload.targetClientId,
+                    ip: ip
+                });
+            },
+            'unblockUser': async () => {
+                if (!payload.ip) {
+                    await this.send(client, "error", 'IP address is required for unblock action');
+                    return;
+                }
+
+                this.webSocketServer.unblockIP(payload.ip);
+
+                await this.send(client, "success", {
+                    action: "unblockUser",
+                    ip: payload.ip
+                });
+            },
+            'vote': async () => {
+                if (!payload.voteValue || !payload.storyId) {
+                    await this.send(client, "error", 'Vote value and story ID are required for vote action');
+                    return;
+                }
+                await this.send(client, "success", {
+                    action: "vote",
+                    storyId: payload.storyId,
+                    voteValue: payload.voteValue
+                });
+            },
+            'revealCards': async () => {
+                if (!payload.storyId) {
+                    await this.send(client, "error", 'Story ID is required for reveal action');
+                    return;
+                }
+                // Get all votes and reveal them
+                await this.send(client, "success", {
+                    action: "revealCards",
+                    storyId: payload.storyId
+                });
+            },
+            'leaveRoom': async () => {
+                if (!payload.roomId) {
+                    await this.send(client, "error", 'Room ID is required to leave a room');
+                    return;
+                }
+                if (!this.roomManager.roomExists(payload.roomId)) {
+                    await this.send(client, "error", `Room ${payload.roomId} does not exist`);
+                    return;
+                }
+                // Get client info and all clients in the room
+                const clientName = client.getClientName();
+                const allClientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
+                const otherClients = allClientsInRoom.filter(id => id !== client.id);
+                
+                // Broadcast to all other clients that admin is leaving
+                this.webSocketServer.broadcast(otherClients, {
+                    type: 'notification',
+                    payload: {
+                        action: 'userLeft',
+                        roomId: payload.roomId,
+                        userName: clientName,
+                        userId: client.id,
+                        isAdmin: true
+                    }
+                });
+                
+                this.roomManager.leaveRoom(payload.roomId, client.id);
+                await this.send(client, "success", {
+                    action: "leaveRoom",
+                    roomId: payload.roomId
+                });
+            },
         };
 
         const handler = actionHandlers[payload.action];
         if (handler) {
-            await handler(client, payload);
+            await handler();
         } else {
-            await this.sendError(
-                client,
-                `Unknown admin action: ${payload.action}`,
-            );
+            await this.send(client, "error", `Unknown admin action: ${payload.action}`);
         }
     }
 
-    private async processCreateRoom(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        const validation = this.validateRequiredFields(payload, ["userName"]);
-        if (!validation.isValid) {
-            console.log(
-                `User name is required for create room action from client ${client.id}`,
-            );
-            await this.sendError(
-                client,
-                "User name is required for create room action",
-            );
-            return;
-        }
-        if (!payload.roomName) {
-            console.log(
-                `Room name is required for create room action from client ${client.id}`,
-            );
-            await this.sendError(
-                client,
-                "Room name is required for create room action",
-            );
-            return;
-        }
-        client.setClientName(payload.userName!);
-        await this.handleCreateRoomSuccess(client, payload);
-    }
-
-    private async processRemoveRoom(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        if (!payload.targetClientId) {
-            await this.sendError(
-                client,
-                "Target client ID is required for remove action",
-            );
-            return;
-        }
-
-        const validation = this.validateRequiredFields(payload, ["roomId"]);
-        if (!validation.isValid) {
-            await this.sendError(
-                client,
-                "Room ID is required for remove action",
-            );
-            return;
-        }
-
-        if (!this.validateRoomExists(payload.roomId!)) {
-            await this.sendError(
-                client,
-                `Room ${payload.roomId} does not exist`,
-            );
-            return;
-        }
-
-        this.roomManager.leaveRoom(payload.roomId!, payload.targetClientId);
-        await this.sendSuccess(client, {
-            action: "removeRoom",
-            roomId: payload.roomId,
-            targetClientId: payload.targetClientId,
+    private async send(client: WebSocketClient, type: string, message: any): Promise<void> {
+        await client.send({
+            type: type,
+            payload: message
         });
-    }
-
-    private async processBlockUser(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        if (!payload.targetClientId || !payload.roomId) {
-            await this.sendError(
-                client,
-                "Room ID and target client ID are required for block action",
-            );
-            return;
-        }
-
-        // Check if the admin is trying to block themselves
-        if (payload.targetClientId === client.id) {
-            await this.sendError(client, "You cannot block yourself");
-            return;
-        }
-
-        // Check if the target user exists
-        const targetClient = this.webSocketServer.getClient(
-            payload.targetClientId,
-        );
-        if (!targetClient) {
-            await this.sendError(client, "Target user not found");
-            return;
-        }
-        const targetIP = targetClient.getIP();
-        if (!targetIP) {
-            await this.sendError(client, "Target user IP not found");
-            return;
-        }
-
-        // Block the IP in the room
-        this.roomManager.blockIPInRoom(payload.roomId, targetIP);
-        // Remove all clients with this IP from the room
-        const removedClientIds = this.roomManager.removeClientByIP(
-            payload.roomId,
-            targetIP,
-            (id) => this.webSocketServer.getClient(id) || { getIP: () => "" },
-        );
-        // Notify and disconnect all affected clients
-        for (const clientId of removedClientIds) {
-            const c = this.webSocketServer.getClient(clientId);
-            if (c) {
-                await this.sendError(
-                    c,
-                    "You have been blocked by an administrator (IP block)",
-                );
-                c.close();
-            }
-        }
-        // Send success response to admin
-        await this.sendSuccess(client, {
-            action: "blockUser",
-            targetClientId: payload.targetClientId,
-            targetIP,
-            removedClientIds,
-            message:
-                `IP ${targetIP} has been blocked in room ${payload.roomId} and ${removedClientIds.length} client(s) removed.`,
-        });
-        console.log(
-            `Admin ${client.getClientName()} blocked IP ${targetIP} in room ${payload.roomId}`,
-        );
-    }
-
-    private async processUnblockUser(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        if (!payload.targetClientId || !payload.roomId) {
-            await this.sendError(
-                client,
-                "Room ID and target client ID are required for unblock action",
-            );
-            return;
-        }
-        // Check if the target user exists
-        const targetClient = this.webSocketServer.getClient(
-            payload.targetClientId,
-        );
-        if (!targetClient) {
-            await this.sendError(client, "Target user not found");
-            return;
-        }
-        const targetIP = targetClient.getIP();
-        if (!targetIP) {
-            await this.sendError(client, "Target user IP not found");
-            return;
-        }
-        // Unblock the IP in the room
-        const wasBlocked = this.roomManager.unblockIPInRoom(
-            payload.roomId,
-            targetIP,
-        );
-        if (!wasBlocked) {
-            await this.sendError(client, "IP was not blocked");
-            return;
-        }
-        await this.sendSuccess(client, {
-            action: "unblockUser",
-            targetClientId: payload.targetClientId,
-            targetIP,
-            message:
-                `IP ${targetIP} has been unblocked in room ${payload.roomId}`,
-        });
-        console.log(
-            `Admin ${client.getClientName()} unblocked IP ${targetIP} in room ${payload.roomId}`,
-        );
-    }
-
-    private async processVote(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        await this.handleVote(client, payload);
-    }
-
-    private async processRevealCards(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        await this.handleRevealCards(client, payload);
-    }
-
-    private async processLeaveRoom(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        await this.handleLeaveRoom(client, payload);
-    }
-
-    private async processGetBlockedUsers(
-        client: WebSocketClient,
-        payload: AdminPayload,
-    ): Promise<void> {
-        if (!payload.roomId) {
-            await this.sendError(
-                client,
-                "Room ID is required to get blocked users",
-            );
-            return;
-        }
-
-        const blockedIPs = this.roomManager.getBlockedIPsInRoom(payload.roomId);
-
-        // Get additional information about blocked IPs
-        const blockedUsersInfo = blockedIPs.map((ip) => {
-            // Find all clients with this IP in the room
-            const clientsWithIP = this.roomManager.getClientsInRoom(
-                payload.roomId!,
-            )
-                .filter((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return client && client.getIP() === ip;
-                });
-
-            return {
-                ip: ip,
-                clientIds: clientsWithIP,
-                clientNames: clientsWithIP.map((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return client ? client.getClientName() : "Unknown User";
-                }),
-                isOnline: clientsWithIP.some((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return !!client;
-                }),
-            };
-        });
-
-        await this.sendSuccess(client, {
-            action: "getBlockedUsers",
-            roomId: payload.roomId,
-            blockedUsers: blockedUsersInfo,
-            count: blockedIPs.length,
-        });
-
-        console.log(
-            `Admin ${client.getClientName()} requested blocked users list for room ${payload.roomId} (${blockedIPs.length} IPs blocked)`,
-        );
     }
 }

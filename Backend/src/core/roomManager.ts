@@ -27,6 +27,15 @@ export class RoomManager {
         RoomManager.instance = this;
     }
 
+    public getRoomIdByClientId(clientId: string): string | null {
+        for (const [roomId, room] of this.rooms.entries()) {
+            if (room.clients.has(clientId)) {
+                return roomId;
+            }
+        }
+        return null;
+    }
+
     public createRoom(adminId: string, roomName: string): string {
         const roomId = this.generateUniqueRoomId();
         this.rooms.set(roomId, {
