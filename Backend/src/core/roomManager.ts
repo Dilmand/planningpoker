@@ -1,13 +1,8 @@
-interface Vote {
-    clientId: string;
-    value: string;
-}
-
 interface Story {
     id: string;
     title?: string;
     description?: string;
-    votes: Map<string, Vote>;
+    votes: Map<string, Number>; // clientId -> Vote
     revealed: boolean;
 }
 
@@ -42,6 +37,10 @@ export class RoomManager {
             stories: new Map(),
             blockedIPs: new Set(),
         });
+        
+        // Create a default "current" story for immediate use
+        this.createStory(roomId, "current", "Current Story");
+        
         console.log(`Room created: ${roomId} by admin ${adminId}`);
         return roomId;
     }
@@ -60,6 +59,12 @@ export class RoomManager {
                 );
                 return false;
             }
+            
+            // Ensure default "current" story exists
+            if (!room.stories.has("current")) {
+                this.createStory(roomId, "current", "Current Story");
+            }
+            
             room.clients.add(clientId);
             console.log(`Client ${clientId} joined room ${roomId}`);
             return true;
@@ -104,6 +109,11 @@ export class RoomManager {
     public getClientsInRoom(roomId: string): string[] {
         const room = this.rooms.get(roomId);
         return room ? Array.from(room.clients) : [];
+    }
+
+    public getStoriesInRoom(roomId: string): Map<string, Story> | null {
+        const room = this.rooms.get(roomId);
+        return room ? room.stories : null;
     }
 
     public blockClient(clientId: string): void {
@@ -170,7 +180,7 @@ export class RoomManager {
             return false;
         }
 
-        story.votes.set(clientId, { clientId, value: voteValue });
+        story.votes.set(clientId, Number(voteValue));
         console.log(
             `Vote recorded for client ${clientId} in story ${storyId}: ${voteValue}`,
         );
@@ -180,7 +190,7 @@ export class RoomManager {
     public revealVotes(
         roomId: string,
         storyId: string,
-    ): Map<string, Vote> | null {
+    ): Map<string, Number> | null {
         const room = this.rooms.get(roomId);
         if (!room) {
             console.error(`Room ${roomId} does not exist.`);
@@ -190,6 +200,14 @@ export class RoomManager {
         const story = room.stories.get(storyId);
         if (!story) {
             console.error(`Story ${storyId} does not exist in room ${roomId}`);
+            return null;
+        }
+
+        console.log(room.stories)
+        if (!this.haveAllVoted(roomId, storyId)) {
+            console.warn(
+                `Not all clients have voted for story ${storyId} in room ${roomId}`,
+            );
             return null;
         }
 
@@ -312,5 +330,13 @@ export class RoomManager {
             }
         }
         return removedClientIds;
+    }
+
+    public storyExists(roomId: string, storyId: string): boolean {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            return false;
+        }
+        return room.stories.has(storyId);
     }
 }
