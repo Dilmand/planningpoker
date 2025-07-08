@@ -96,7 +96,7 @@ export abstract class BaseHandler implements IMessageHandler {
         const voteRecorded = this.roomManager.recordVote(
             payload.roomId!,
             payload.storyId!,
-            client.id,
+            client.getIP(),
             payload.voteValue!
         );
 
@@ -113,7 +113,7 @@ export abstract class BaseHandler implements IMessageHandler {
             action: "vote",
             storyId: payload.storyId,
             voteValue: payload.voteValue,
-            userId: client.id,
+            userId: client.getIP(),
         });
 
         // Broadcast to all OTHER clients in the room that someone voted
@@ -122,7 +122,7 @@ export abstract class BaseHandler implements IMessageHandler {
             "userVoted",
             client,
             {
-                userId: client.id,
+                userId: client.getIP(),
                 userName: client.getClientName(),
                 voteValue: payload.voteValue,
                 storyId: payload.storyId,
@@ -202,7 +202,7 @@ export abstract class BaseHandler implements IMessageHandler {
         // Broadcast to all other clients that user is leaving
         await this.broadcastUserAction(roomId, "userLeft", client);
 
-        this.roomManager.leaveRoom(roomId, client.id);
+        this.roomManager.leaveRoom(roomId, client.getIP());
         await this.sendSuccess(client, {
             action: "leaveRoom",
             roomId: roomId,
@@ -212,20 +212,20 @@ export abstract class BaseHandler implements IMessageHandler {
     protected getParticipantsInRoom(
         roomId: string,
     ): Array<{ userId: string; userName: string; isAdmin: boolean }> {
-        const allClientsInRoom = this.roomManager.getClientsInRoom(roomId);
-        if (!allClientsInRoom || allClientsInRoom.length === 0) {
+        const allClientIPsInRoom = this.roomManager.getClientsInRoom(roomId);
+        if (!allClientIPsInRoom || allClientIPsInRoom.length === 0) {
             return [];
         }
 
-        return allClientsInRoom
-            .map((clientId) => {
-                const clientObj = this.webSocketServer.getClient(clientId);
+        return allClientIPsInRoom
+            .map((clientIP) => {
+                const clientObj = this.webSocketServer.getClientByIP(clientIP);
                 if (!clientObj) return null;
 
                 return {
-                    userId: clientId,
+                    userId: clientIP, // Use IP as userId
                     userName: clientObj.getClientName(),
-                    isAdmin: this.roomManager.isAdmin(roomId, clientId),
+                    isAdmin: this.roomManager.isAdmin(roomId, clientIP),
                 };
             })
             .filter((
@@ -265,7 +265,7 @@ export abstract class BaseHandler implements IMessageHandler {
         payload: BasePayload,
     ): Promise<void> {
         const roomId = this.roomManager.createRoom(
-            client.id,
+            client.getIP(),
             payload.roomName!,
             payload.stories || [], // Pass stories to room creation
         );
@@ -313,15 +313,15 @@ export abstract class BaseHandler implements IMessageHandler {
         additionalData?: any,
     ): Promise<void> {
         const userName = client.getClientName();
-        const userId = client.id;
-        const isAdmin = this.roomManager.isAdmin(roomId, userId);
+        const userIP = client.getIP();
+        const isAdmin = this.roomManager.isAdmin(roomId, userIP);
 
         await this.broadcastNotification(roomId, action, {
             userName,
-            userId,
+            userId: userIP, // Use IP as userId
             isAdmin,
             ...additionalData,
-        }, action === "userJoined" ? userId : undefined);
+        }, action === "userJoined" ? userIP : undefined);
     }
 
     protected async broadcastGameAction(
@@ -334,8 +334,8 @@ export abstract class BaseHandler implements IMessageHandler {
 
         await this.broadcastNotification(roomId, action, {
             initiatorName,
-            initiatorId: initiatorClient.id,
+            initiatorId: initiatorClient.getIP(), // Use IP instead of client.id
             ...gameData,
-        }, initiatorClient.id); // Exclude the initiator from receiving the notification
+        }, initiatorClient.getIP()); // Exclude the initiator from receiving the notification
     }
 }

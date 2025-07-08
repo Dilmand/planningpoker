@@ -48,14 +48,14 @@ export class WebSocketServer {
         const client = new WebSocketClient(ws, this, ip);
         this.clients.add(client);
         console.log(
-            `Client ${client.id} registered. Total clients: ${this.clients.size}`,
+            `Client IP ${ip} connected with internal ID ${client.id}. Total clients: ${this.clients.size}`,
         );
     }
 
     public unregisterClient(client: WebSocketClient): void {
         if (this.clients.delete(client)) {
             console.log(
-                `Client ${client.id} unregistered. Total clients: ${this.clients.size}`,
+                `Client IP ${client.getIP()} unregistered. Total clients: ${this.clients.size}`,
             );
         }
     }
@@ -80,17 +80,16 @@ export class WebSocketServer {
         const handler = this.messageHandlers.get(message.type);
         if (handler) {
             try {
-                await handler.handle(client, message.payload);
-            } catch (error: any) {
-                console.error(
-                    `Error handling message type "${message.type}" from client ${client.id}:`,
-                    error,
-                );
-                client.send({
-                    type: "error",
-                    payload: `Error processing your request: ${error.message}`,
-                });
-            }
+                await handler.handle(client, message.payload);        } catch (error: any) {
+            console.error(
+                `Error handling message type "${message.type}" from client IP ${client.getIP()}:`,
+                error,
+            );
+            client.send({
+                type: "error",
+                payload: `Error processing your request: ${error.message}`,
+            });
+        }
         } else {
             console.warn(
                 `No handler registered for message type: "${message.type}"`,
@@ -111,9 +110,22 @@ export class WebSocketServer {
         return undefined;
     }
 
+    public getClientByIP(ip: string): WebSocketClient | undefined {
+        for (const client of this.clients) {
+            if (client.getIP() === ip) {
+                return client;
+            }
+        }
+        return undefined;
+    }
+
     public broadcast(clientIds: string[], message: IServerMessage): void {
         for (const clientId of clientIds) {
-            const client = this.getClient(clientId);
+            // Try to get client by IP first (new approach), then fall back to ID (legacy)
+            let client = this.getClientByIP(clientId);
+            if (!client) {
+                client = this.getClient(clientId);
+            }
             if (client) {
                 client.send(message);
             }

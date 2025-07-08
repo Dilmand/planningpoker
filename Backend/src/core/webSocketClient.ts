@@ -8,14 +8,14 @@ export interface IClientMessage {
     payload?: any;
 }
 export class WebSocketClient {
-    public id: string;
+    public id: string; // Keep for backward compatibility, but use IP as primary identifier
     private ws: WebSocket;
     private server: WebSocketServer;
     private clientName?: string;
     private ip: string;
 
     constructor(ws: WebSocket, server: WebSocketServer, ip: string) {
-        this.id = uuid();
+        this.id = uuid(); // Keep for internal WebSocket management
         this.ws = ws;
         this.server = server;
         this.ip = ip;
@@ -30,7 +30,7 @@ export class WebSocketClient {
         );
         this.ws.on("error", (error: Error) => this.handleError(error));
 
-        console.log(`[Client ${this.id}] Connected from IP ${this.ip}.`);
+        console.log(`[Client IP ${this.ip}] Connected with internal ID ${this.id}.`);
     }
 
     public setClientName(name: string): void {
@@ -38,10 +38,15 @@ export class WebSocketClient {
     }
 
     public getClientName(): string {
-        return this.clientName || `Anonymous-${this.id.substring(0, 8)}`;
+        return this.clientName || `Anonymous-${this.ip.replace(/\./g, '-')}`;
     }
 
     public getIP(): string {
+        return this.ip;
+    }
+
+    // Get primary identifier (IP address)
+    public getPrimaryId(): string {
         return this.ip;
     }
 
@@ -49,7 +54,7 @@ export class WebSocketClient {
         try {
             this.ws.send(JSON.stringify(message));
         } catch (error) {
-            console.error(`[Client ${this.id}] Error sending message:`, error);
+            console.error(`[Client IP ${this.ip}] Error sending message:`, error);
         }
     }
 

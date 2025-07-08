@@ -12,14 +12,14 @@ export interface AdminPayload extends BasePayload {
         | "revealCards"
         | "changeCurrentStory"
         | "leaveRoom";
-    targetClientId?: string;
+    targetClientIp?: string;
 }
 
 export class AdminHandler extends BaseHandler {
     async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
         const handlerType = this.getHandlerType();
         console.log(
-            `${handlerType} action received from client ${client.id}:`,
+            `${handlerType} action received from client IP ${client.getIP()}:`,
             receivedPayload,
         );
 
@@ -67,13 +67,13 @@ export class AdminHandler extends BaseHandler {
     ): Promise<void> {
         // Validate that the client is the admin of the room for all actions except createRoom
         if (payload.action !== "createRoom" && payload.roomId) {
-            if (!this.roomManager.isAdmin(payload.roomId, client.id)) {
+            if (!this.roomManager.isAdmin(payload.roomId, client.getIP())) {
                 await this.sendError(
                     client,
                     "Only the admin of this room can execute admin commands",
                 );
                 console.log(
-                    `Unauthorized admin action attempt: Client ${client.id} (${client.getClientName()}) tried to execute ${payload.action} in room ${payload.roomId}`,
+                    `Unauthorized admin action attempt: Client IP ${client.getIP()} (${client.getClientName()}) tried to execute ${payload.action} in room ${payload.roomId}`,
                 );
                 return;
             }
@@ -112,7 +112,7 @@ export class AdminHandler extends BaseHandler {
         const validation = this.validateRequiredFields(payload, ["userName"]);
         if (!validation.isValid) {
             console.log(
-                `User name is required for create room action from client ${client.id}`,
+                `User name is required for create room action from client IP ${client.getIP()}`,
             );
             await this.sendError(
                 client,
@@ -122,7 +122,7 @@ export class AdminHandler extends BaseHandler {
         }
         if (!payload.roomName) {
             console.log(
-                `Room name is required for create room action from client ${client.id}`,
+                `Room name is required for create room action from client IP ${client.getIP()}`,
             );
             await this.sendError(
                 client,
@@ -138,10 +138,10 @@ export class AdminHandler extends BaseHandler {
         client: WebSocketClient,
         payload: AdminPayload,
     ): Promise<void> {
-        if (!payload.targetClientId) {
+        if (!payload.targetClientIp) {
             await this.sendError(
                 client,
-                "Target client ID is required for remove action",
+                "Target client IP is required for remove action",
             );
             return;
         }
@@ -163,11 +163,12 @@ export class AdminHandler extends BaseHandler {
             return;
         }
 
-        this.roomManager.leaveRoom(payload.roomId!, payload.targetClientId);
+        // targetClientIp now represents IP address
+        this.roomManager.leaveRoom(payload.roomId!, payload.targetClientIp);
         await this.sendSuccess(client, {
             action: "removeRoom",
             roomId: payload.roomId,
-            targetClientId: payload.targetClientId,
+            targetClientIp: payload.targetClientIp,
         });
     }
 
@@ -175,64 +176,67 @@ export class AdminHandler extends BaseHandler {
         client: WebSocketClient,
         payload: AdminPayload,
     ): Promise<void> {
-        if (!payload.targetClientId || !payload.roomId) {
+        if (!payload.targetClientIp || !payload.roomId) {
             await this.sendError(
                 client,
-                "Room ID and target client ID are required for block action",
+                "Room ID and target client IP are required for block action",
             );
             return;
         }
 
         // Check if the admin is trying to block themselves
-        if (payload.targetClientId === client.id) {
+        if (payload.targetClientIp === client.getIP()) {
             await this.sendError(client, "You cannot block yourself");
             return;
         }
 
-        // Check if the target user exists
-        const targetClient = this.webSocketServer.getClient(
-            payload.targetClientId,
-        );
-        if (!targetClient) {
-            await this.sendError(client, "Target user not found");
-            return;
-        }
-        const targetIP = targetClient.getIP();
-        if (!targetIP) {
-            await this.sendError(client, "Target user IP not found");
-            return;
-        }
+        // targetClientIp now represents the target IP address
+        const targetIP = payload.targetClientIp;
 
-        // Block the IP in the room
-        this.roomManager.blockIPInRoom(payload.roomId, targetIP);
-        // Remove all clients with this IP from the room
-        const removedClientIds = this.roomManager.removeClientByIP(
-            payload.roomId,
-            targetIP,
-            (id) => this.webSocketServer.getClient(id) || { getIP: () => "" },
-        );
-        // Notify and disconnect all affected clients
-        for (const clientId of removedClientIds) {
-            const c = this.webSocketServer.getClient(clientId);
-            if (c) {
-                await this.sendError(
-                    c,
-                    "You have been blocked by an administrator (IP block)",
-                );
-                c.close();
-            }
+        // Check if the target IP is currently in the room
+        const clientsInRoom = this.roomManager.getClientsInRoom(payload.roomId);
+        const isInRoom = clientsInRoom.includes(targetIP);
+
+        // Block the IP in the room (adds to blockedIPs list)
+        const blockSuccess = this.roomManager.blockIPInRoom(payload.roomId, targetIP);
+        if (!blockSuccess) {
+            await this.sendError(client, "Failed to block IP in room");
+            return;
         }
+        
+        // Remove the client with this IP from the room (removes from clients list)
+        if (isInRoom) {
+            this.roomManager.leaveRoom(payload.roomId, targetIP);
+            
+            // Notify and disconnect the affected client
+            const targetClient = this.webSocketServer.getClientByIP(targetIP);
+            if (targetClient) {
+                await this.sendError(
+                    targetClient,
+                    "You have been blocked by an administrator and removed from the room",
+                );
+                targetClient.close();
+            }
+
+            // Broadcast to ALL clients in the room (including admin) that user was blocked and removed
+            await this.broadcastUserAction(payload.roomId, "userBlocked", client, {
+                blockedUserIP: targetIP,
+                blockedUserName: targetClient ? targetClient.getClientName() : "Unknown User",
+                reason: "blocked by admin"
+            });
+        }
+        
         // Send success response to admin
         await this.sendSuccess(client, {
             action: "blockUser",
-            targetClientId: payload.targetClientId,
+            targetClientIp: payload.targetClientIp,
             targetIP,
-            removedClientIds,
-            message:
-                `IP ${targetIP} has been blocked in room ${payload.roomId} and ${removedClientIds.length} client(s) removed.`,
+            wasInRoom: isInRoom,
+            message: `IP ${targetIP} has been blocked in room ${payload.roomId}${isInRoom ? ' and user was removed from the room' : ''}.`,
         });
+        
         console.log(
-            `Admin ${client.getClientName()} blocked IP ${targetIP} in room ${payload.roomId}`,
+            `Admin ${client.getClientName()} blocked IP ${targetIP} in room ${payload.roomId}${isInRoom ? ' and removed user from room' : ''}`,
         );
     }
 
@@ -240,26 +244,17 @@ export class AdminHandler extends BaseHandler {
         client: WebSocketClient,
         payload: AdminPayload,
     ): Promise<void> {
-        if (!payload.targetClientId || !payload.roomId) {
+        if (!payload.targetClientIp || !payload.roomId) {
             await this.sendError(
                 client,
-                "Room ID and target client ID are required for unblock action",
+                "Room ID and target client IP are required for unblock action",
             );
             return;
         }
-        // Check if the target user exists
-        const targetClient = this.webSocketServer.getClient(
-            payload.targetClientId,
-        );
-        if (!targetClient) {
-            await this.sendError(client, "Target user not found");
-            return;
-        }
-        const targetIP = targetClient.getIP();
-        if (!targetIP) {
-            await this.sendError(client, "Target user IP not found");
-            return;
-        }
+        
+        // targetClientIp now represents the target IP address
+        const targetIP = payload.targetClientIp;
+        
         // Unblock the IP in the room
         const wasBlocked = this.roomManager.unblockIPInRoom(
             payload.roomId,
@@ -269,12 +264,18 @@ export class AdminHandler extends BaseHandler {
             await this.sendError(client, "IP was not blocked");
             return;
         }
+
+        // Broadcast to all clients in the room that IP was unblocked
+        await this.broadcastUserAction(payload.roomId, "userUnblocked", client, {
+            unblockedUserIP: targetIP,
+            reason: "unblocked by admin"
+        });
+
         await this.sendSuccess(client, {
             action: "unblockUser",
-            targetClientId: payload.targetClientId,
+            targetClientIp: payload.targetClientIp,
             targetIP,
-            message:
-                `IP ${targetIP} has been unblocked in room ${payload.roomId}`,
+            message: `IP ${targetIP} has been unblocked in room ${payload.roomId}`,
         });
         console.log(
             `Admin ${client.getClientName()} unblocked IP ${targetIP} in room ${payload.roomId}`,
@@ -318,26 +319,18 @@ export class AdminHandler extends BaseHandler {
 
         // Get additional information about blocked IPs
         const blockedUsersInfo = blockedIPs.map((ip) => {
-            // Find all clients with this IP in the room
-            const clientsWithIP = this.roomManager.getClientsInRoom(
-                payload.roomId!,
-            )
-                .filter((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return client && client.getIP() === ip;
-                });
-
+            // Check if there's currently a client with this IP in the room
+            const clientsInRoom = this.roomManager.getClientsInRoom(payload.roomId!);
+            const isCurrentlyInRoom = clientsInRoom.includes(ip);
+            
+            // Get client info if they're currently connected
+            const client = this.webSocketServer.getClientByIP(ip);
+            
             return {
                 ip: ip,
-                clientIds: clientsWithIP,
-                clientNames: clientsWithIP.map((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return client ? client.getClientName() : "Unknown User";
-                }),
-                isOnline: clientsWithIP.some((clientId) => {
-                    const client = this.webSocketServer.getClient(clientId);
-                    return !!client;
-                }),
+                clientIds: [ip], // IP is now the identifier
+                clientNames: client ? [client.getClientName()] : ["Unknown User"],
+                isOnline: !!client && isCurrentlyInRoom,
             };
         });
 

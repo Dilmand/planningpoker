@@ -141,19 +141,19 @@ export class WebSocketManager {
     });
   }
 
-  blockUser(targetClientId) {
+  blockUser(targetClientIp) {
     if (!this.currentRoom || this.role !== CLIENT_ROLES.ADMIN) return false;
     return this.sendMessage(CLIENT_ACTIONS.BLOCK_USER, { 
       roomId: this.currentRoom, 
-      targetClientId 
+      targetClientIp 
     });
   }
 
-  unblockUser(targetClientId) {
+  unblockUser(targetClientIp) {
     if (!this.currentRoom || this.role !== CLIENT_ROLES.ADMIN) return false;
     return this.sendMessage(CLIENT_ACTIONS.UNBLOCK_USER, { 
       roomId: this.currentRoom, 
-      targetClientId 
+      targetClientIp 
     });
   }
 

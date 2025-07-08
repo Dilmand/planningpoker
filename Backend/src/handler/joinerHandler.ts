@@ -9,7 +9,7 @@ export class JoinerHandler extends BaseHandler {
     async handle(client: WebSocketClient, receivedPayload: any): Promise<void> {
         const handlerType = this.getHandlerType();
         console.log(
-            `${handlerType} action received from client ${client.id}:`,
+            `${handlerType} action received from client IP ${client.getIP()}:`,
             receivedPayload,
         );
 
@@ -85,7 +85,7 @@ export class JoinerHandler extends BaseHandler {
         ]);
         if (!validation.isValid) {
             console.log(
-                `${validation.missingField} is required for join action from client ${client.id}`,
+                `${validation.missingField} is required for join action from client IP ${client.getIP()}`,
             );
             await this.sendError(
                 client,
@@ -95,7 +95,7 @@ export class JoinerHandler extends BaseHandler {
         }
 
         client.setClientName(payload.userName!);
-        const joined = this.roomManager.joinRoom(payload.roomId!, client.id);
+        const joined = this.roomManager.joinRoom(payload.roomId!, client.getIP());
 
         if (joined) {
             await this.handleJoinRoomSuccess(client, payload);

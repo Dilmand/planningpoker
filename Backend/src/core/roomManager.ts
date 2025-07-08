@@ -2,15 +2,15 @@ interface Story {
     id: string;
     title?: string;
     description?: string;
-    votes: Map<string, Number>; // clientId -> Vote
+    votes: Map<string, Number>; // IP address -> Vote
     revealed: boolean;
 }
 
 interface Room {
     id: string;
-    adminId: string;
+    adminIP: string; // Changed from adminId to adminIP
     roomName: string;
-    clients: Set<string>; // Set of clientIds
+    clients: Set<string>; // Set of IP addresses instead of clientIds
     stories: Map<string, Story>; // storyId -> Story
     currentStoryId?: string;
     blockedIPs: Set<string>; // Set of blocked IP addresses
@@ -29,13 +29,13 @@ export class RoomManager {
         RoomManager.instance = this;
     }
 
-    public createRoom(adminId: string, roomName: string, stories: BasePayload["stories"]): string {
+    public createRoom(adminIP: string, roomName: string, stories: BasePayload["stories"]): string {
         const roomId = this.generateUniqueRoomId();
         this.rooms.set(roomId, {
             id: roomId,
-            adminId,
+            adminIP,
             roomName: roomName,
-            clients: new Set([adminId]),
+            clients: new Set([adminIP]),
             stories: new Map(),
             blockedIPs: new Set(),
         });
@@ -52,19 +52,18 @@ export class RoomManager {
             this.createStory(roomId, "current", "Current Story");
         }
         
-        console.log(`Room created: ${roomId} by admin ${adminId} with ${stories?.length || 0} stories`);
+        console.log(`Room created: ${roomId} by admin IP ${adminIP} with ${stories?.length || 0} stories`);
         return roomId;
     }
 
     public joinRoom(
         roomId: string,
-        clientId: string,
-        clientIP?: string,
+        clientIP: string,
     ): boolean {
         const room = this.rooms.get(roomId);
         if (room) {
             // Check if client's IP is blocked in this room
-            if (clientIP && room.blockedIPs.has(clientIP)) {
+            if (room.blockedIPs.has(clientIP)) {
                 console.warn(
                     `Blocked IP ${clientIP} attempted to join room ${roomId}`,
                 );
@@ -76,8 +75,8 @@ export class RoomManager {
                 this.createStory(roomId, "current", "Current Story");
             }
             
-            room.clients.add(clientId);
-            console.log(`Client ${clientId} joined room ${roomId}`);
+            room.clients.add(clientIP);
+            console.log(`Client IP ${clientIP} joined room ${roomId}`);
             return true;
         } else {
             console.error(`Room ${roomId} does not exist.`);
@@ -85,17 +84,17 @@ export class RoomManager {
         }
     }
 
-    public leaveRoom(roomId: string, clientId: string): void {
+    public leaveRoom(roomId: string, clientIP: string): void {
         const room = this.rooms.get(roomId);
         if (room) {
-            room.clients.delete(clientId);
-            console.log(`Client ${clientId} left room ${roomId}`);
+            room.clients.delete(clientIP);
+            console.log(`Client IP ${clientIP} left room ${roomId}`);
 
             // If admin leaves, assign a new admin or close the room
-            if (clientId === room.adminId && room.clients.size > 0) {
-                room.adminId = [...room.clients][0]; // Assign first remaining client as admin
+            if (clientIP === room.adminIP && room.clients.size > 0) {
+                room.adminIP = [...room.clients][0]; // Assign first remaining client as admin
                 console.log(
-                    `New admin assigned for room ${roomId}: ${room.adminId}`,
+                    `New admin assigned for room ${roomId}: ${room.adminIP}`,
                 );
             } else if (room.clients.size === 0) {
                 // Delete room if empty
@@ -107,9 +106,9 @@ export class RoomManager {
         }
     }
 
-    public isAdmin(roomId: string, clientId: string): boolean {
+    public isAdmin(roomId: string, clientIP: string): boolean {
         const room = this.rooms.get(roomId);
-        return room ? room.adminId === clientId : false;
+        return room ? room.adminIP === clientIP : false;
     }
 
     public getRoomName(roomId: string): string {
@@ -158,11 +157,11 @@ export class RoomManager {
         return stories.length > 0 ? stories[0] : null;
     }
 
-    public blockClient(clientId: string): void {
+    public blockClient(clientIP: string): void {
         // Remove blocked client from all rooms
         this.rooms.forEach((room, roomId) => {
-            if (room.clients.has(clientId)) {
-                this.leaveRoom(roomId, clientId);
+            if (room.clients.has(clientIP)) {
+                this.leaveRoom(roomId, clientIP);
             }
         });
     }
@@ -202,7 +201,7 @@ export class RoomManager {
     public recordVote(
         roomId: string,
         storyId: string,
-        clientId: string,
+        clientIP: string,
         voteValue: string,
     ): boolean {
         const room = this.rooms.get(roomId);
@@ -217,14 +216,14 @@ export class RoomManager {
             return false;
         }
 
-        if (!room.clients.has(clientId)) {
-            console.error(`Client ${clientId} is not in room ${roomId}`);
+        if (!room.clients.has(clientIP)) {
+            console.error(`Client IP ${clientIP} is not in room ${roomId}`);
             return false;
         }
 
-        story.votes.set(clientId, Number(voteValue));
+        story.votes.set(clientIP, Number(voteValue));
         console.log(
-            `Vote recorded for client ${clientId} in story ${storyId}: ${voteValue}`,
+            `Vote recorded for client IP ${clientIP} in story ${storyId}: ${voteValue}`,
         );
         return true;
     }
@@ -283,7 +282,7 @@ export class RoomManager {
         if (!story) return false;
 
         // Check if all clients in the room have voted
-        return [...room.clients].every((clientId) => story.votes.has(clientId));
+        return [...room.clients].every((clientIP) => story.votes.has(clientIP));
     }
 
     private generateUniqueRoomId(): string {
@@ -355,26 +354,19 @@ export class RoomManager {
     public removeClientByIP(
         roomId: string,
         ipAddress: string,
-        getClientById: (id: string) => { getIP(): string },
-    ): string[] {
+    ): boolean {
         const room = this.rooms.get(roomId);
         if (!room) {
             console.error(`Room ${roomId} does not exist.`);
-            return [];
+            return false;
         }
 
-        const removedClientIds: string[] = [];
-        for (const clientId of Array.from(room.clients)) {
-            const client = getClientById(clientId);
-            if (client && client.getIP() === ipAddress) {
-                this.leaveRoom(roomId, clientId);
-                removedClientIds.push(clientId);
-            }
+        if (room.clients.has(ipAddress)) {
+            this.leaveRoom(roomId, ipAddress);
+            console.log(`Removed client with IP ${ipAddress} from room ${roomId}`);
+            return true;
         }
 
-        console.log(
-            `Removed ${removedClientIds.length} clients with IP ${ipAddress} from room ${roomId}`,
-        );
-        return removedClientIds;
+        return false;
     }
 }
