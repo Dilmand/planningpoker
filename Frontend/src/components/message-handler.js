@@ -73,12 +73,12 @@ export class MessageHandler {
         window.location.reload();
       },
       [SUCCESS_ACTIONS.BLOCK_USER]: () => {
-        this.component.showToast(`User blocked: ${payload.targetClientId}`);
-        this.updateParticipantStatus(payload.targetClientId, true);
+        this.component.showToast(`IP ${payload.targetIP || payload.targetClientIp} blocked successfully`);
+        // Status update wird durch die Benachrichtigung behandelt
       },
       [SUCCESS_ACTIONS.UNBLOCK_USER]: () => {
-        this.component.showToast(`User unblocked: ${payload.targetClientId}`);
-        this.updateParticipantStatus(payload.targetClientId, false);
+        this.component.showToast(`User unblocked: ${payload.targetClientIp}`);
+        // Status update wird durch die Benachrichtigung behandelt
       }
     };
 
@@ -118,8 +118,31 @@ export class MessageHandler {
         this.revealAllCards(payload);
       },
       [NOTIFICATION_ACTIONS.USER_BLOCKED]: () => {
-        this.component.showToast(`${payload.userName} was blocked`);
-        this.updateParticipantStatus(payload.userId, true);
+        this.component.showToast(`${payload.blockedUserName || 'User'} was blocked and removed`);
+        // Remove the blocked user from the players section (avatar area) but keep in participants list
+        const blockedUserId = payload.blockedUserIP;
+        if (blockedUserId) {
+          // Remove from players section (avatar area)
+          const playerElement = this.component.shadowRoot.querySelector(`#playersSection [data-user-id="${blockedUserId}"]`);
+          if (playerElement) playerElement.remove();
+          
+          // Update status in participants list to show blocked
+          this.updateParticipantStatus(blockedUserId, true);
+        }
+      },
+      [NOTIFICATION_ACTIONS.USER_UNBLOCKED]: () => {
+        this.component.showToast(`IP ${payload.unblockedUserIP || 'Unknown'} was unblocked`);
+
+        const unblockedUserId = payload.unblockedUserIP;
+        if (unblockedUserId) {
+          // Remove from participants list completely
+          const listElement = this.component.shadowRoot.querySelector(`#participantsList [data-user-id="${unblockedUserId}"]`);
+          if (listElement) {
+            listElement.remove();
+          }
+          
+          // User can now rejoin with fresh entry in the participants list
+        }
       },
       [NOTIFICATION_ACTIONS.USER_VOTED]: () => {
         this.component.showToast(`${payload.userName} voted`);
