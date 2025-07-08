@@ -10,6 +10,7 @@ export interface AdminPayload extends BasePayload {
         | "getBlockedUsers"
         | "vote"
         | "revealCards"
+        | "changeCurrentStory"
         | "leaveRoom";
     targetClientId?: string;
 }
@@ -89,6 +90,7 @@ export class AdminHandler extends BaseHandler {
             "getBlockedUsers": this.processGetBlockedUsers.bind(this),
             "vote": this.processVote.bind(this),
             "revealCards": this.processRevealCards.bind(this),
+            "changeCurrentStory": this.processChangeCurrentStory.bind(this),
             "leaveRoom": this.processLeaveRoom.bind(this),
         };
 
@@ -345,9 +347,64 @@ export class AdminHandler extends BaseHandler {
             blockedUsers: blockedUsersInfo,
             count: blockedIPs.length,
         });
+    }
 
-        console.log(
-            `Admin ${client.getClientName()} requested blocked users list for room ${payload.roomId} (${blockedIPs.length} IPs blocked)`,
+    private async processChangeCurrentStory(
+        client: WebSocketClient,
+        payload: AdminPayload,
+    ): Promise<void> {
+        const validation = this.validateRequiredFields(payload, ["roomId", "storyId"]);
+        if (!validation.isValid) {
+            await this.sendError(
+                client,
+                "Room ID and Story ID are required for change current story action",
+            );
+            return;
+        }
+
+        // Update current story in room
+        const success = this.roomManager.setCurrentStory(payload.roomId!, payload.storyId!);
+        if (!success) {
+            await this.sendError(
+                client,
+                "Failed to change current story. Story or room not found.",
+            );
+            return;
+        }
+
+        // Get story details
+        const story = this.roomManager.getStory(payload.roomId!, payload.storyId!);
+        if (!story) {
+            await this.sendError(
+                client,
+                "Story not found after setting as current.",
+            );
+            return;
+        }
+
+        // Broadcast to all clients in the room
+        await this.broadcastNotification(
+            payload.roomId!,
+            "storyChanged",
+            {
+                storyId: payload.storyId,
+                story: {
+                    id: story.id,
+                    title: story.title,
+                    description: story.description,
+                }
+            }
         );
+
+        await this.sendSuccess(client, {
+            action: "changeCurrentStory",
+            roomId: payload.roomId,
+            storyId: payload.storyId,
+            story: {
+                id: story.id,
+                title: story.title,
+                description: story.description,
+            }
+        });
     }
 }
