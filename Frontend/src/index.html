@@ -7,7 +7,7 @@
 </head>
 <body>
     <script type="module" src="components/planning-poker.js"></script>
-    <planning-poker ws-url="ws://localhost:8699">
+    <planning-poker id="poker">
         {
             "stories": [
                 {
@@ -28,5 +28,11 @@
             ]
         }
     </planning-poker>
+    <script>
+        const hostname = window.location.hostname;
+        const url = `ws://${hostname}:8699`;
+        const pokerElement = document.getElementById('poker');
+        pokerElement.setAttribute('ws-url', url);
+    </script>
 </body>
 </html>
