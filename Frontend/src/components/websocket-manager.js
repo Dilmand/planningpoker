@@ -11,6 +11,7 @@ export const CLIENT_ACTIONS = {
   UNBLOCK_USER: 'unblockUser',
   GET_BLOCKED_USERS: 'getBlockedUsers',
   REVEAL_CARDS: 'revealCards',
+  CHANGE_CURRENT_STORY: 'changeCurrentStory',
   
   // Joiner Actions
   JOIN_ROOM: 'joinRoom',
@@ -100,8 +101,12 @@ export class WebSocketManager {
 
   
   // Room Management
-  createRoom(roomName, userName) {
-    return this.sendMessage(CLIENT_ACTIONS.CREATE_ROOM, { roomName, userName });
+  createRoom(roomName, userName, stories = []) {
+    return this.sendMessage(CLIENT_ACTIONS.CREATE_ROOM, { 
+      roomName, 
+      userName, 
+      stories 
+    });
   }
 
   joinRoom(roomId, userName) {
@@ -149,6 +154,14 @@ export class WebSocketManager {
     return this.sendMessage(CLIENT_ACTIONS.UNBLOCK_USER, { 
       roomId: this.currentRoom, 
       targetClientId 
+    });
+  }
+
+  changeCurrentStory(storyId) {
+    if (!this.currentRoom || this.role !== CLIENT_ROLES.ADMIN) return false;
+    return this.sendMessage(CLIENT_ACTIONS.CHANGE_CURRENT_STORY, {
+      roomId: this.currentRoom,
+      storyId
     });
   }
 

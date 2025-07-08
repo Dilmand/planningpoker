@@ -8,8 +8,13 @@
       <h1>{{roomName}}</h1>
     </header>
 
+    <div class="current-story-display">
+      <h2 id="currentStoryTitle">Current Story</h2>
+      <p id="currentStoryDescription">Story description will appear here...</p>
+    </div>
+
     <div class="average-wrapper">
-      <label>Durchschnitt</label>
+      <label>Average</label>
       <div class="average-display">?</div>
     </div>
 
@@ -39,5 +44,15 @@
     <ul id="participantsList">
       <!-- Teilnehmer werden dynamisch eingefügt -->
     </ul>
+    <div class="story-selection">
+      <label for="storySelect">Current User Story:</label>
+      <select id="storySelect">
+        <!-- Stories werden dynamisch eingefügt -->
+      </select>
+      <div class="story-details" id="storyDetails">
+        <h3 id="storyTitle">Story Title</h3>
+        <p id="storyDescription">Story description will appear here...</p>
+      </div>
+    </div>
   </aside>
 </div>
