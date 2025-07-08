@@ -10,6 +10,11 @@ export interface BasePayload {
     userName?: string;
     voteValue?: string;
     storyId?: string;
+    stories?: Array<{
+        id: string;
+        title?: string;
+        description?: string;
+    }>;
 }
 
 export abstract class BaseHandler implements IMessageHandler {
@@ -88,24 +93,6 @@ export abstract class BaseHandler implements IMessageHandler {
             return;
         }
 
-        // Record the vote in the room manager
-        // Ensure the story exists (create default story if needed)
-        if (!this.roomManager.storyExists(payload.roomId!, payload.storyId!)) {
-            // Create a default story if it doesn't exist
-            const storyCreated = this.roomManager.createStory(
-                payload.roomId!,
-                payload.storyId!,
-                "Default Story"
-            );
-            if (!storyCreated) {
-                await this.sendError(
-                    client,
-                    `Failed to create story ${payload.storyId} in room ${payload.roomId}`,
-                );
-                return;
-            }
-        }
-
         const voteRecorded = this.roomManager.recordVote(
             payload.roomId!,
             payload.storyId!,
@@ -161,7 +148,6 @@ export abstract class BaseHandler implements IMessageHandler {
             );
             return;
         }
-        console.log(this.roomManager.getStoriesInRoom(payload.roomId!));
         if (!this.roomManager.haveAllVoted(payload.roomId!, payload.storyId!)) {
             await this.sendError(
                 client,
@@ -266,6 +252,8 @@ export abstract class BaseHandler implements IMessageHandler {
             roomName: roomName,
             userName: payload.userName,
             participants: participants,
+            stories: this.roomManager.getStoriesInRoom(roomId),
+            currentStory: this.roomManager.getCurrentStory(roomId),
         });
 
         // Broadcast to all other clients in the room
@@ -279,6 +267,7 @@ export abstract class BaseHandler implements IMessageHandler {
         const roomId = this.roomManager.createRoom(
             client.id,
             payload.roomName!,
+            payload.stories || [], // Pass stories to room creation
         );
         const participants = this.getParticipantsInRoom(roomId);
 
@@ -287,6 +276,8 @@ export abstract class BaseHandler implements IMessageHandler {
             roomId: roomId,
             roomName: payload.roomName,
             participants: participants,
+            stories: this.roomManager.getStoriesInRoom(roomId),
+            currentStory: this.roomManager.getCurrentStory(roomId),
         });
     }
 

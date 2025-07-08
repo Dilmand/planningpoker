@@ -7,8 +7,12 @@ class PlanningPoker extends HTMLElement {
     this.loadedStyles = new Set();
     this.attachShadow({ mode: "open" });
 
+    // Parse initial stories from component content
+    this.defaultStories = this.parseDefaultStories();
+
     this.messageHandler = new MessageHandler(this);
     this.wsManager = new WebSocketManager(this, this.messageHandler);
+    this.currentStoryId = null; // Track current story ID
 
     this.showToast                = this.showToast.bind(this);
     this.loadTemplate             = this.loadTemplate.bind(this);
@@ -142,7 +146,8 @@ class PlanningPoker extends HTMLElement {
     
     try {
       await this.wsManager.connect(wsURL, CLIENT_ROLES.ADMIN);
-      this.wsManager.createRoom(roomName, userName);
+      // Send default stories when creating room
+      this.wsManager.createRoom(roomName, userName, this.defaultStories);
     } catch (error) {
       console.error("Failed to connect or create room:", error);
       this.showToast("Failed to connect to server");
@@ -157,6 +162,9 @@ class PlanningPoker extends HTMLElement {
     });
 
     this.wsManager.currentRoom = payload.roomId;
+
+    // Setup story selection for joiners too (read-only)
+    this._setupStorySelection(payload.stories || [], false, payload.currentStory);
 
     const playersSection = this.shadowRoot.getElementById('playersSection');
     if (playersSection && payload.participants) {
@@ -213,7 +221,7 @@ class PlanningPoker extends HTMLElement {
           }
         }
         
-        this.wsManager.vote(voteValue);
+        this.wsManager.vote(voteValue, this.currentStoryId || 'current');
       });
     });
 
@@ -232,6 +240,9 @@ class PlanningPoker extends HTMLElement {
 
     this.wsManager.currentRoom = payload.roomId;
 
+    // Setup story selection
+    this._setupStorySelection(payload.stories || [], true, payload.currentStory);
+
     const playersSection = this.shadowRoot.getElementById('playersSection');
     if (playersSection && payload.participants) {
       playersSection.innerHTML = '';
@@ -287,13 +298,13 @@ class PlanningPoker extends HTMLElement {
           }
         }
         
-        this.wsManager.vote(voteValue);
+        this.wsManager.vote(voteValue, this.currentStoryId || 'current');
       });
     });
 
     this.shadowRoot.getElementById('revealCardsButton')
       .addEventListener('click', () => {
-        this.wsManager.revealCards();
+        this.wsManager.revealCards(this.currentStoryId || 'current');
       });
 
     this.shadowRoot.querySelector('.reset')
@@ -342,7 +353,6 @@ class PlanningPoker extends HTMLElement {
     return li;
   }
 
-
   _createParticipantActionSelect(participant) {
     const select = document.createElement('select');
     select.innerHTML = `
@@ -361,10 +371,105 @@ class PlanningPoker extends HTMLElement {
         this.wsManager.unblockUser(participant.userId);
       }
       
-      select.value = 'Aktion wählen';
+      select.value = '';
     });
     
     return select;
+  }
+
+  _setupStorySelection(stories, isAdmin = true, currentStory = null) {
+    const storySelect = this.shadowRoot.getElementById('storySelect');
+    const storyTitle = this.shadowRoot.getElementById('storyTitle');
+    const storyDescription = this.shadowRoot.getElementById('storyDescription');
+    
+    // Elements in the main area
+    const currentStoryTitle = this.shadowRoot.getElementById('currentStoryTitle');
+    const currentStoryDescription = this.shadowRoot.getElementById('currentStoryDescription');
+    
+    if (!stories) return;
+
+    // Only populate dropdown for admins
+    if (storySelect && isAdmin) {
+      storySelect.innerHTML = '';
+      stories.forEach(story => {
+        const option = document.createElement('option');
+        option.value = story.id;
+        option.textContent = story.title || story.id;
+        storySelect.appendChild(option);
+      });
+
+      // Set up change listener only for admins
+      storySelect.addEventListener('change', (e) => {
+        const selectedStoryId = e.target.value;
+        const selectedStory = stories.find(s => s.id === selectedStoryId);
+        
+        if (selectedStory) {
+          // Set current story ID for voting
+          this.currentStoryId = selectedStoryId;
+          
+          // Update sidebar
+          if (storyTitle) storyTitle.textContent = selectedStory.title || selectedStoryId;
+          if (storyDescription) storyDescription.textContent = selectedStory.description || 'No description available';
+          
+          // Update main area
+          if (currentStoryTitle) currentStoryTitle.textContent = selectedStory.title || selectedStoryId;
+          if (currentStoryDescription) currentStoryDescription.textContent = selectedStory.description || 'No description available';
+          
+          // Reset voting for new story
+          this._resetVoting();
+          
+          // Send story change to server if admin
+          if (this.wsManager.role === 'admin') {
+            this.wsManager.changeCurrentStory(selectedStoryId);
+          }
+        }
+      });
+    }
+
+    // Determine which story to display initially
+    let initialStory = null;
+    if (currentStory && stories.find(s => s.id === currentStory.id)) {
+      initialStory = currentStory;
+    } else if (stories.length > 0) {
+      // Fall back to first story
+      initialStory = stories[0];
+    }
+
+    // Initialize display with the determined story
+    if (initialStory) {
+      // Set current story ID for voting
+      this.currentStoryId = initialStory.id;
+      
+      if (storyTitle && isAdmin) storyTitle.textContent = initialStory.title || initialStory.id;
+      if (storyDescription && isAdmin) storyDescription.textContent = initialStory.description || 'No description available';
+      
+      if (currentStoryTitle) currentStoryTitle.textContent = initialStory.title || initialStory.id;
+      if (currentStoryDescription) currentStoryDescription.textContent = initialStory.description || 'No description available';
+      
+      if (storySelect && isAdmin) storySelect.value = initialStory.id;
+    }
+  }
+
+  _resetVoting() {
+    // Clear all player votes
+    this.shadowRoot.querySelectorAll('.player').forEach(player => {
+      player.dataset.value = '?';
+      const voteCard = player.querySelector('.vote-card');
+      if (voteCard) {
+        voteCard.style.backgroundColor = 'white';
+        voteCard.style.borderColor = '#ddd';
+      }
+    });
+
+    // Clear selected card
+    this.shadowRoot.querySelectorAll('.card-select button')
+      .forEach(btn => btn.classList.remove('selected'));
+
+    // Reset average display
+    const averageDisplay = this.shadowRoot.querySelector('.average-display');
+    if (averageDisplay) {
+      averageDisplay.textContent = '?';
+    }
   }
 
   showToast(message) {
@@ -396,6 +501,19 @@ class PlanningPoker extends HTMLElement {
     if (this.wsManager) {
       this.wsManager.disconnect();
     }
+  }
+
+  parseDefaultStories() {
+    try {
+      const content = this.textContent.trim();
+      if (content) {
+        const data = JSON.parse(content);
+        return data.stories || [];
+      }
+    } catch (error) {
+      console.warn("Could not parse default stories from component content:", error);
+    }
+    return [];
   }
 }
 

@@ -16,6 +16,8 @@ interface Room {
     blockedIPs: Set<string>; // Set of blocked IP addresses
 }
 
+import {BasePayload} from "../handler/baseHandler";
+
 export class RoomManager {
     private rooms: Map<string, Room> = new Map(); // roomId -> Room
     static instance: RoomManager;
@@ -27,7 +29,7 @@ export class RoomManager {
         RoomManager.instance = this;
     }
 
-    public createRoom(adminId: string, roomName: string): string {
+    public createRoom(adminId: string, roomName: string, stories: BasePayload["stories"]): string {
         const roomId = this.generateUniqueRoomId();
         this.rooms.set(roomId, {
             id: roomId,
@@ -38,10 +40,19 @@ export class RoomManager {
             blockedIPs: new Set(),
         });
         
-        // Create a default "current" story for immediate use
-        this.createStory(roomId, "current", "Current Story");
+        // Create stories from the provided list
+        if (stories && stories.length > 0) {
+            stories.forEach(story => {
+                this.createStory(roomId, story.id, story.title, story.description);
+            });
+            // Set the first story as current
+            this.rooms.get(roomId)!.currentStoryId = stories[0].id;
+        } else {
+            // Create a default "current" story for immediate use if no stories provided
+            this.createStory(roomId, "current", "Current Story");
+        }
         
-        console.log(`Room created: ${roomId} by admin ${adminId}`);
+        console.log(`Room created: ${roomId} by admin ${adminId} with ${stories?.length || 0} stories`);
         return roomId;
     }
 
@@ -111,9 +122,40 @@ export class RoomManager {
         return room ? Array.from(room.clients) : [];
     }
 
-    public getStoriesInRoom(roomId: string): Map<string, Story> | null {
+    public getStoriesInRoom(roomId: string): Array<Story> {
         const room = this.rooms.get(roomId);
-        return room ? room.stories : null;
+        if (!room) return [];
+        return Array.from(room.stories.values());
+    }
+
+    public setCurrentStory(roomId: string, storyId: string): boolean {
+        const room = this.rooms.get(roomId);
+        if (!room) return false;
+        
+        if (!room.stories.has(storyId)) return false;
+        
+        room.currentStoryId = storyId;
+        return true;
+    }
+
+    public getStory(roomId: string, storyId: string): Story | null {
+        const room = this.rooms.get(roomId);
+        if (!room) return null;
+        
+        return room.stories.get(storyId) || null;
+    }
+
+    public getCurrentStory(roomId: string): Story | null {
+        const room = this.rooms.get(roomId);
+        if (!room) return null;
+        
+        if (room.currentStoryId) {
+            return room.stories.get(room.currentStoryId) || null;
+        }
+        
+        // Fall back to first story if no current story is set
+        const stories = Array.from(room.stories.values());
+        return stories.length > 0 ? stories[0] : null;
     }
 
     public blockClient(clientId: string): void {
@@ -329,14 +371,10 @@ export class RoomManager {
                 removedClientIds.push(clientId);
             }
         }
-        return removedClientIds;
-    }
 
-    public storyExists(roomId: string, storyId: string): boolean {
-        const room = this.rooms.get(roomId);
-        if (!room) {
-            return false;
-        }
-        return room.stories.has(storyId);
+        console.log(
+            `Removed ${removedClientIds.length} clients with IP ${ipAddress} from room ${roomId}`,
+        );
+        return removedClientIds;
     }
 }

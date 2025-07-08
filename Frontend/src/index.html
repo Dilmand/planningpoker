@@ -7,6 +7,32 @@
 </head>
 <body>
     <script type="module" src="components/planning-poker.js"></script>
-    <planning-poker ws-url="ws://localhost:8699"></planning-poker>
+    <planning-poker id="poker">
+        {
+            "stories": [
+                {
+                    "id": "story1",
+                    "title": "User Story 1",
+                    "description": "As a user, I want to be able to log in so that I can access my account."
+                },
+                {
+                    "id": "story2",
+                    "title": "User Story 2",
+                    "description": "As a user, I want to be able to reset my password so that I can regain access if I forget it."
+                },
+                {
+                    "id": "story3",
+                    "title": "User Story 3",
+                    "description": "As a user, I want to be able to reset my password so that I can regain access if I forget it. As a user, I want to be able to reset my password so that I can regain access if I forget it. As a user, I want to be able to reset my password so that I can regain access if I forget it."
+                }
+            ]
+        }
+    </planning-poker>
+    <script>
+        const hostname = window.location.hostname;
+        const url = `ws://${hostname}:8699`;
+        const pokerElement = document.getElementById('poker');
+        pokerElement.setAttribute('ws-url', url);
+    </script>
 </body>
 </html>

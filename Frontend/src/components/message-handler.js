@@ -23,7 +23,8 @@ export const NOTIFICATION_ACTIONS = {
   CARDS_REVEALED: 'cardsRevealed',
   USER_BLOCKED: 'userBlocked',
   USER_UNBLOCKED: 'userUnblocked',
-  USER_VOTED: 'userVoted'
+  USER_VOTED: 'userVoted',
+  STORY_CHANGED: 'storyChanged'
 };
 
 export class MessageHandler {
@@ -124,9 +125,9 @@ export class MessageHandler {
         this.component.showToast(`${payload.userName} voted`);
         this.updatePlayerVote(payload);
       },
-      [NOTIFICATION_ACTIONS.USER_VOTED]: () => {
-        this.component.showToast(`${payload.userName} voted`);
-        this.updatePlayerVote(payload);
+      [NOTIFICATION_ACTIONS.STORY_CHANGED]: () => {
+        this.component.showToast(`Story changed to: ${payload.story.title}`);
+        this.updateCurrentStory(payload.story);
       }
     };
 
@@ -286,5 +287,39 @@ export class MessageHandler {
     setTimeout(() => {
       window.location.reload();
     }, 2000);
+  }
+
+  updateCurrentStory(story) {
+    // Update current story ID in the component
+    this.component.currentStoryId = story.id;
+    
+    // Update main area story display
+    const currentStoryTitle = this.component.shadowRoot.getElementById('currentStoryTitle');
+    const currentStoryDescription = this.component.shadowRoot.getElementById('currentStoryDescription');
+    
+    if (currentStoryTitle) {
+      currentStoryTitle.textContent = story.title || story.id;
+    }
+    if (currentStoryDescription) {
+      currentStoryDescription.textContent = story.description || 'No description available';
+    }
+
+    // Update sidebar story display (if admin)
+    const storyTitle = this.component.shadowRoot.getElementById('storyTitle');
+    const storyDescription = this.component.shadowRoot.getElementById('storyDescription');
+    const storySelect = this.component.shadowRoot.getElementById('storySelect');
+    
+    if (storyTitle) {
+      storyTitle.textContent = story.title || story.id;
+    }
+    if (storyDescription) {
+      storyDescription.textContent = story.description || 'No description available';
+    }
+    if (storySelect) {
+      storySelect.value = story.id;
+    }
+
+    // Reset voting when story changes
+    this.component._resetVoting();
   }
 }
