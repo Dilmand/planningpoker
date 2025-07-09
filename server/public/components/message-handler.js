@@ -136,25 +136,6 @@ export class MessageHandler {
             : `Story changed to: ${payload.story.title}`;
 
         this.component.showToast(message);
-      },
-      [NOTIFICATION_ACTIONS.ROOM_CREATED]: () => {
-        // Handle room creation success
-        this.component._renderAdminRoom(payload);
-      },
-      [NOTIFICATION_ACTIONS.USER_REMOVED]: () => {
-        this.component.showToast(`User ${payload.targetClientIp} was removed from the room`);
-        this.removeParticipantFromList(payload.targetClientIp);
-      },
-      [NOTIFICATION_ACTIONS.USER_BLOCK_SUCCESS]: () => {
-        this.component.showToast(`IP ${payload.targetIP || payload.targetClientIp} blocked successfully`);
-      },
-      [NOTIFICATION_ACTIONS.USER_UNBLOCK_SUCCESS]: () => {
-        this.component.showToast(`User unblocked: ${payload.targetClientIp}`);
-      },
-      [NOTIFICATION_ACTIONS.BLOCKED_USERS_INFO]: () => {
-        // Handle blocked users info response
-        console.log('Blocked users:', payload.blockedUsers);
-        // You could update a UI component here to show the blocked users list
       }
     };
 
