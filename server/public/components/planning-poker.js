@@ -481,15 +481,6 @@ class PlanningPoker extends HTMLElement {
         img.alt = player.dataset.userId || 'Avatar';
         player.insertBefore(img, voteCard);
       }
-
-      // Avatar wieder anzeigen, falls er entfernt wurde
-      let img = player.querySelector('img');
-      if (!img) {
-        img = document.createElement('img');
-        img.src = `avatare/avatar_${index + 1}.jpeg`;
-        img.alt = player.dataset.userId || 'Avatar';
-        player.insertBefore(img, voteCard);
-      }
     });
 
     // Clear selected card
