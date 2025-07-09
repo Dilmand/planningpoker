@@ -12,7 +12,7 @@ class PlanningPoker extends HTMLElement {
 
     this.messageHandler = new MessageHandler(this);
     this.wsManager = new WebSocketManager(this, this.messageHandler);
-    this.currentStoryId = null; // Track current story ID
+    this.currentStoryId = null;
 
     this.showToast                = this.showToast.bind(this);
     this.loadTemplate             = this.loadTemplate.bind(this);

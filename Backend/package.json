@@ -10,10 +10,12 @@
     "test": "jest"
   },
   "dependencies": {
+    "express": "^5.1.0",
     "uuid": "^11.1.0",
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "jest": "^29.6.1",
