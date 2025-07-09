@@ -240,24 +240,14 @@ export class MessageHandler {
       // Check if participant already exists
       const existingParticipant = ul.querySelector(`[data-user-id="${payload.userId}"]`);
       if (!existingParticipant) {
-        const li = document.createElement('li');
-        li.dataset.userId = payload.userId;
-        li.textContent = payload.userName + ' ';
-        
-        const status = document.createElement('span');
-        status.textContent = '✅';
-        li.appendChild(status);
-        
-        // Only add action select if we have the method (admin view)
-        if (this.component._createParticipantActionSelect) {
-          const actionSelect = this.component._createParticipantActionSelect({
-            userId: payload.userId,
-            userName: payload.userName,
-            blocked: false
-          });
-          li.appendChild(actionSelect);
-        }
-        
+        // Create new participant using the same method as the admin room setup
+        const participantData = {
+          userId: payload.userId,
+          userName: payload.userName,
+          isAdmin: payload.isAdmin || false,
+          blocked: false
+        };
+        const li = this.component._createParticipantElement(participantData);
         ul.appendChild(li);
       }
     }
@@ -315,10 +305,46 @@ export class MessageHandler {
   }
 
   updateParticipantStatus(userId, isBlocked) {
-    // Update status in participants list (admin view)
-    const listStatusElement = this.component.shadowRoot.querySelector(`#participantsList [data-user-id="${userId}"] span`);
-    if (listStatusElement) {
-      listStatusElement.textContent = isBlocked ? '🚫' : '✅';
+    // Find the participant element
+    const participantElement = this.component.shadowRoot.querySelector(`#participantsList [data-user-id="${userId}"]`);
+    if (participantElement) {
+      // Update the status indicator (green/red dot)
+      const statusIndicator = participantElement.children[2]; // Third child is the status indicator
+      if (statusIndicator) {
+        statusIndicator.style.background = isBlocked ? '#dc3545' : '#28a745';
+      }
+      
+      // Update the action button if it exists (4th child)
+      const actionButton = participantElement.children[3];
+      if (actionButton && actionButton.tagName === 'BUTTON') {
+        if (isBlocked) {
+          // Change to unblock button
+          actionButton.innerHTML = '🛡️';
+          actionButton.style.borderColor = '#28a745';
+          actionButton.style.background = '#28a745';
+          actionButton.title = 'Unblock User';
+          
+          // Remove old event listeners and add new one
+          actionButton.replaceWith(actionButton.cloneNode(true));
+          const newButton = participantElement.children[3];
+          newButton.addEventListener('click', () => {
+            this.component.wsManager.unblockUser(userId);
+          });
+        } else {
+          // Change to block button
+          actionButton.innerHTML = '🚫';
+          actionButton.style.borderColor = '#dc3545';
+          actionButton.style.background = '#dc3545';
+          actionButton.title = 'Block User';
+          
+          // Remove old event listeners and add new one
+          actionButton.replaceWith(actionButton.cloneNode(true));
+          const newButton = participantElement.children[3];
+          newButton.addEventListener('click', () => {
+            this.component.wsManager.blockUser(userId);
+          });
+        }
+      }
     }
   }
 

@@ -346,47 +346,148 @@ class PlanningPoker extends HTMLElement {
   _createParticipantElement(participant) {
     const li = document.createElement('li');
     li.dataset.userId = participant.userId;
+    li.style.cssText = `
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      gap: 12px;
+    `;
 
+    // Avatar
+    const avatar = document.createElement('div');
+    avatar.style.cssText = `
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+    `;
+    avatar.textContent = participant.userName.charAt(0).toUpperCase();
+    
+    // Name section
+    const nameSection = document.createElement('div');
+    nameSection.style.cssText = `
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+    
     const nameSpan = document.createElement('span');
     nameSpan.className = 'participant-name';
     nameSpan.textContent = participant.userName;
+    nameSpan.style.cssText = `
+      font-weight: 500;
+      color: #333;
+      font-size: 16px;
+    `;
+    
+    nameSection.appendChild(nameSpan);
+    
+    // Admin crown icon
+    if (participant.isAdmin) {
+      const crown = document.createElement('span');
+      crown.textContent = '👑';
+      crown.style.cssText = `
+        font-size: 16px;
+      `;
+      nameSection.appendChild(crown);
+    }
 
-    const status = document.createElement('span');
-    status.className = 'participant-status';
-    status.textContent = participant.blocked ? '🚫' : '✅';
+    // Status indicator (green dot)
+    const statusIndicator = document.createElement('div');
+    statusIndicator.style.cssText = `
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: ${participant.blocked ? '#dc3545' : '#28a745'};
+      flex-shrink: 0;
+    `;
 
-    const actionSelect = this._createParticipantActionSelect(participant);
-    actionSelect.className = 'participant-select';
+    li.appendChild(avatar);
+    li.appendChild(nameSection);
+    li.appendChild(statusIndicator);
 
-    li.appendChild(nameSpan);
-    li.appendChild(status);
-    li.appendChild(actionSelect);
+    // Only add action button if not admin
+    if (!participant.isAdmin) {
+      const actionButton = this._createParticipantActionButton(participant);
+      li.appendChild(actionButton);
+    }
 
     return li;
   }
 
-  _createParticipantActionSelect(participant) {
-    const select = document.createElement('select');
-    select.innerHTML = `
-      <option>Choose Action</option>
-      <option value="block">Block User</option>
-      <option value="unblock">Unblock User</option>
-    `;
+  _createParticipantActionButton(participant) {
+    const button = document.createElement('button');
     
-    select.addEventListener('change', () => {
-      const action = select.value;
-      const status = select.parentElement.querySelector('span');
+    // Determine button style and action based on blocked status
+    const isBlocked = participant.blocked || false;
+    
+    if (isBlocked) {
+      // Unblock button (shield with checkmark)
+      button.innerHTML = '🛡️';
+      button.style.cssText = `
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        border: 2px solid #28a745;
+        background: #28a745;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+      `;
+      button.title = 'Unblock User';
       
-      if (action === 'block') {
-        this.wsManager.blockUser(participant.userId);
-      } else if (action === 'unblock') {
+      button.addEventListener('click', () => {
         this.wsManager.unblockUser(participant.userId);
-      }
+      });
+    } else {
+      // Block button (prohibition sign)
+      button.innerHTML = '🚫';
+      button.style.cssText = `
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        border: 2px solid #dc3545;
+        background: #dc3545;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+      `;
+      button.title = 'Block User';
       
-      select.value = '';
+      button.addEventListener('click', () => {
+        this.wsManager.blockUser(participant.userId);
+      });
+    }
+    
+    // Hover effects
+    button.addEventListener('mouseenter', () => {
+      button.style.transform = 'scale(1.1)';
     });
     
-    return select;
+    button.addEventListener('mouseleave', () => {
+      button.style.transform = 'scale(1)';
+    });
+    
+    return button;
   }
 
   _setupStorySelection(stories, isAdmin = true, currentStory = null) {
