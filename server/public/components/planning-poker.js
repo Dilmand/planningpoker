@@ -356,9 +356,9 @@ class PlanningPoker extends HTMLElement {
   _createParticipantActionSelect(participant) {
     const select = document.createElement('select');
     select.innerHTML = `
-      <option>Aktion wählen</option>
-      <option value="block">User blockieren</option>
-      <option value="unblock">User entblockieren</option>
+      <option>Choose Action</option>
+      <option value="block">Block User</option>
+      <option value="unblock">Unblock User</option>
     `;
     
     select.addEventListener('change', () => {
