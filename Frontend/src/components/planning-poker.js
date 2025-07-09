@@ -25,6 +25,17 @@ class PlanningPoker extends HTMLElement {
     this.shadowRoot.innerHTML = '<div>Loading...</div>';
   }
 
+  static get observedAttributes() {
+    return ['primary-color'];
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (name === 'primary-color') {
+      this.style.setProperty('--primary-color', newValue);
+    }
+  }
+
+
   async connectedCallback() {
     const wsURL = this.getAttribute("ws-url");
     try {
