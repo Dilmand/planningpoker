@@ -61,13 +61,14 @@ class PlanningPoker extends HTMLElement {
 
 
     const toggleBtn = this.shadowRoot.getElementById('toggleSidebarBtn');
-    const sidebar = this.shadowRoot.querySelector('aside.admin-only');
+    const sidebar   = this.shadowRoot.getElementById('participantsSidebar');
 
     if (toggleBtn && sidebar) {
       toggleBtn.addEventListener('click', () => {
         sidebar.classList.toggle('open');
       });
     }
+
 
 
   }
@@ -188,7 +189,7 @@ class PlanningPoker extends HTMLElement {
         if (participant.userName === payload.userName) div.dataset.own = 'true';
 
         const img = document.createElement('img');
-        img.src = `avatare/avatar_${i+1}.jpeg`;
+        img.src = `avatare/avatar_${(i%9)+1}.jpeg`;
         img.alt = participant.userName;
         div.appendChild(img);
 
@@ -265,7 +266,7 @@ class PlanningPoker extends HTMLElement {
         if (participant.userName === payload.userName) div.dataset.own = 'true';
 
         const img = document.createElement('img');
-        img.src = `avatare/avatar_${i+1}.jpeg`;
+        img.src = `avatare/avatar_${(i%9)+1}.jpeg`;
         img.alt = participant.userName;
         div.appendChild(img);
 
@@ -477,7 +478,7 @@ class PlanningPoker extends HTMLElement {
       let img = player.querySelector('img');
       if (!img) {
         img = document.createElement('img');
-        img.src = `avatare/avatar_${index + 1}.jpeg`;
+        img.src = `avatare/avatar_${((index % 9) + 1)}.jpeg`;
         img.alt = player.dataset.userId || 'Avatar';
         player.insertBefore(img, voteCard);
       }
