@@ -126,8 +126,15 @@ export class MessageHandler {
         this.updatePlayerVote(payload);
       },
       [NOTIFICATION_ACTIONS.STORY_CHANGED]: () => {
-        this.component.showToast(`Story changed to: ${payload.story.title}`);
+        const isSameStory = payload.story.id === this.component.currentStoryId;
+
         this.updateCurrentStory(payload.story);
+
+        const message = isSameStory
+            ? "Cards have been reset!"
+            : `Story changed to: ${payload.story.title}`;
+
+        this.component.showToast(message);
       }
     };
 
