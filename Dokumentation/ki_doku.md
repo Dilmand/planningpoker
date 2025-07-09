@@ -9,10 +9,10 @@ Verwendung von GitHub Copilot (Claude Sonnte 4 & GPT-4.1) zur Unterstützung bei
 **Aufwand:** Mittel bis Hoch (je nach Komplexität des Codes und Umfang des Refactorings)
 
 **Beteiligte:**  
-- Luca  
-- Felix  
-- Jonas  
-- Raphael
+- Dilmand 
+- Jan  
+- Tom  
+- Tarnbir
 
 ---
 
@@ -24,7 +24,6 @@ Einsatz von Copilot zur Generierung von Unit- und Integrationstests, insbesonder
 
 **Beteiligte:**  
 -Tarnbir
-
 ---
 
 ### 3. Dokumentation & Architektur
