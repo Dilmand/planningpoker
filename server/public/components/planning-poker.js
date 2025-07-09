@@ -478,7 +478,7 @@ class PlanningPoker extends HTMLElement {
       let img = player.querySelector('img');
       if (!img) {
         img = document.createElement('img');
-        img.src = `avatare/avatar_${((index % 9) + 1)}.jpeg`;
+        img.src = `avatare/avatar_${index + 1}.jpeg`;
         img.alt = player.dataset.userId || 'Avatar';
         player.insertBefore(img, voteCard);
       }
@@ -506,7 +506,6 @@ class PlanningPoker extends HTMLElement {
     const b = parseInt(primaryColor.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
-
 
   showToast(message) {
     let toast = this.shadowRoot.getElementById('toast');
