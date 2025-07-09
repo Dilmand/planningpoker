@@ -155,7 +155,7 @@ export class MessageHandler {
       // Update vote card color to indicate vote was cast
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.style.backgroundColor = 'var(--primary-color)'; // Fixed missing closing parenthesis
+        voteCard.style.backgroundColor = 'var(--primary-color)'; // Blue color
         voteCard.style.borderColor = 'var(--primary-color)';
       }
     }
