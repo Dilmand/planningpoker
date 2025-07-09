@@ -2,12 +2,12 @@
     
 
     display: block;
-    font-family: sans-serif;
     background: var(--background);
     color: var(--text-color);
     padding: 1rem;
     min-height: 100vh;
     box-sizing: border-box;
+    font-family: inherit;
 }
 
 *{
@@ -95,6 +95,7 @@
     border-radius: 0.5rem;
     border: 1px solid #d1d5db;
     font-size: 1rem;
+    font-family: inherit;
   }
 
   input[type='text']:focus {
@@ -110,6 +111,7 @@
     border-radius: 0.5rem;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    font-family: inherit;
   }
 
   button:hover {
