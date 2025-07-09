@@ -1,3 +1,6 @@
+import {BasePayload} from "../handler/baseHandler";
+
+
 interface Story {
     id: string;
     title?: string;
@@ -8,15 +11,14 @@ interface Story {
 
 interface Room {
     id: string;
-    adminIP: string; // Changed from adminId to adminIP
+    adminIP: string;
     roomName: string;
-    clients: Set<string>; // Set of IP addresses instead of clientIds
+    clients: Set<string>; // Set of IP addresses
     stories: Map<string, Story>; // storyId -> Story
     currentStoryId?: string;
     blockedIPs: Set<string>; // Set of blocked IP addresses
 }
 
-import {BasePayload} from "../handler/baseHandler";
 
 export class RoomManager {
     private rooms: Map<string, Room> = new Map(); // roomId -> Room
