@@ -481,7 +481,6 @@ class PlanningPoker extends HTMLElement {
         img.alt = player.dataset.userId || 'Avatar';
         player.insertBefore(img, voteCard);
       }
-
     });
 
     // Clear selected card
@@ -493,18 +492,6 @@ class PlanningPoker extends HTMLElement {
     if (averageDisplay) {
       averageDisplay.textContent = '?';
     }
-  }
-
-  hexToRgba(value, alpha) {
-
-    const primaryColor = getComputedStyle(document.documentElement)
-    .getPropertyValue(value)
-    .trim();
-
-    const r = parseInt(primaryColor.slice(1, 3), 16);
-    const g = parseInt(primaryColor.slice(3, 5), 16);
-    const b = parseInt(primaryColor.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
 
