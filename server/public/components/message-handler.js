@@ -1,20 +1,9 @@
 // Message Types vom Backend
 export const MESSAGE_TYPES = {
-  SUCCESS: 'success',
   ERROR: 'error',
   NOTIFICATION: 'notification'
 };
 
-// Success Actions
-export const SUCCESS_ACTIONS = {
-  JOIN_ROOM: 'joinRoom',
-  CREATE_ROOM: 'createRoom',
-  VOTE: 'vote',
-  REVEAL_CARDS: 'revealCards',
-  LEAVE_ROOM: 'leaveRoom',
-  BLOCK_USER: 'blockUser',
-  UNBLOCK_USER: 'unblockUser'
-};
 
 // Notification Actions
 export const NOTIFICATION_ACTIONS = {
@@ -24,7 +13,12 @@ export const NOTIFICATION_ACTIONS = {
   USER_BLOCKED: 'userBlocked',
   USER_UNBLOCKED: 'userUnblocked',
   USER_VOTED: 'userVoted',
-  STORY_CHANGED: 'storyChanged'
+  STORY_CHANGED: 'storyChanged',
+  ROOM_CREATED: 'roomCreated',
+  USER_REMOVED: 'userRemoved',
+  USER_BLOCK_SUCCESS: 'userBlockSuccess',
+  USER_UNBLOCK_SUCCESS: 'userUnblockSuccess',
+  BLOCKED_USERS_INFO: 'blockedUsersInfo'
 };
 
 export class MessageHandler {
@@ -35,7 +29,6 @@ export class MessageHandler {
 
   initializeHandlers() {
     return {
-      [MESSAGE_TYPES.SUCCESS]: this.handleSuccessMessage.bind(this),
       [MESSAGE_TYPES.ERROR]: this.handleErrorMessage.bind(this),
       [MESSAGE_TYPES.NOTIFICATION]: this.handleNotificationMessage.bind(this)
     };
@@ -51,44 +44,7 @@ export class MessageHandler {
     }
   }
 
-  async handleSuccessMessage(payload, ws, role) {
-    const successHandlers = {
-      [SUCCESS_ACTIONS.JOIN_ROOM]: async () => {
-        await this.component._renderJoinerRoom(payload);
-      },
-      [SUCCESS_ACTIONS.CREATE_ROOM]: async () => {
-        await this.component._renderAdminRoom(payload);
-      },
-      [SUCCESS_ACTIONS.VOTE]: () => {
-        this.component.showToast(`Vote recorded: ${payload.voteValue}`);
-        this.updatePlayerVote(payload);
-      },
-      [SUCCESS_ACTIONS.REVEAL_CARDS]: () => {
-        this.component.showToast("Cards revealed!");
-        this.revealAllCards(payload);
-      },
-      [SUCCESS_ACTIONS.LEAVE_ROOM]: () => {
-        this.component.showToast("You left the room.");
-        this.component.wsManager.disconnect();
-        window.location.reload();
-      },
-      [SUCCESS_ACTIONS.BLOCK_USER]: () => {
-        this.component.showToast(`IP ${payload.targetIP || payload.targetClientIp} blocked successfully`);
-        // Status update wird durch die Benachrichtigung behandelt
-      },
-      [SUCCESS_ACTIONS.UNBLOCK_USER]: () => {
-        this.component.showToast(`User unblocked: ${payload.targetClientIp}`);
-        // Status update wird durch die Benachrichtigung behandelt
-      }
-    };
 
-    const handler = successHandlers[payload.action];
-    if (handler) {
-      await handler();
-    } else {
-      console.warn('Unknown success action:', payload.action);
-    }
-  }
 
 
   handleErrorMessage(payload, ws, role) {
@@ -106,12 +62,28 @@ export class MessageHandler {
   handleNotificationMessage(payload, ws, role) {
     const notificationHandlers = {
       [NOTIFICATION_ACTIONS.USER_JOINED]: () => {
-        this.component.showToast(`${payload.userName} joined the room`);
-        this.addParticipantToList(payload);
+        // Handle both joining as a new user and getting the full room state
+        if (payload.isOwnAction) {
+          // This is my own join - render the room
+          this.component._renderJoinerRoom(payload);
+        } else {
+          // Someone else joined - just add them to the participant list and players section
+          // DO NOT re-render the entire room as this would lose admin privileges
+          this.component.showToast(`${payload.userName} joined the room`);
+          this.addParticipantToList(payload);
+        }
       },
       [NOTIFICATION_ACTIONS.USER_LEFT]: () => {
-        this.component.showToast(`${payload.userName} left the room`);
-        this.removeParticipantFromList(payload.userId);
+        if (payload.isOwnAction) {
+          // This is my own leave action
+          this.component.showToast("You left the room.");
+          this.component.wsManager.disconnect();
+          window.location.reload();
+        } else {
+          // Someone else left
+          this.component.showToast(`${payload.userName} left the room`);
+          this.removeParticipantFromList(payload.userId);
+        }
       },
       [NOTIFICATION_ACTIONS.CARDS_REVEALED]: () => {
         this.component.showToast("Cards have been revealed!");
@@ -145,19 +117,43 @@ export class MessageHandler {
         }
       },
       [NOTIFICATION_ACTIONS.USER_VOTED]: () => {
-        this.component.showToast(`${payload.userName} voted`);
+        if (payload.isOwnVote) {
+          // This is my own vote
+          this.component.showToast(`Vote recorded: ${payload.voteValue}`);
+        } else {
+          // Someone else voted
+          this.component.showToast(`${payload.userName} voted`);
+        }
         this.updatePlayerVote(payload);
       },
       [NOTIFICATION_ACTIONS.STORY_CHANGED]: () => {
         const isSameStory = payload.story.id === this.component.currentStoryId;
 
         this.updateCurrentStory(payload.story);
-
         const message = isSameStory
             ? "Cards have been reset!"
             : `Story changed to: ${payload.story.title}`;
 
         this.component.showToast(message);
+      },
+      [NOTIFICATION_ACTIONS.ROOM_CREATED]: () => {
+        // Handle room creation success
+        this.component._renderAdminRoom(payload);
+      },
+      [NOTIFICATION_ACTIONS.USER_REMOVED]: () => {
+        this.component.showToast(`User ${payload.targetClientIp} was removed from the room`);
+        this.removeParticipantFromList(payload.targetClientIp);
+      },
+      [NOTIFICATION_ACTIONS.USER_BLOCK_SUCCESS]: () => {
+        this.component.showToast(`IP ${payload.targetIP || payload.targetClientIp} blocked successfully`);
+      },
+      [NOTIFICATION_ACTIONS.USER_UNBLOCK_SUCCESS]: () => {
+        this.component.showToast(`User unblocked: ${payload.targetClientIp}`);
+      },
+      [NOTIFICATION_ACTIONS.BLOCKED_USERS_INFO]: () => {
+        // Handle blocked users info response
+        console.log('Blocked users:', payload.blockedUsers);
+        // You could update a UI component here to show the blocked users list
       }
     };
 
@@ -177,7 +173,7 @@ export class MessageHandler {
       // Update vote card color to indicate vote was cast
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.style.backgroundColor = 'var(--primary-color'; // Blue color
+        voteCard.style.backgroundColor = 'var(--primary-color)'; // Fixed missing closing parenthesis
         voteCard.style.borderColor = 'var(--primary-color)';
       }
     }
@@ -227,61 +223,73 @@ export class MessageHandler {
   }
 
   addParticipantToList(payload) {
+    // Update participants list (admin view only)
     const ul = this.component.shadowRoot.getElementById('participantsList');
     if (ul) {
-      const li = document.createElement('li');
-      li.dataset.userId = payload.userId;
-      li.textContent = payload.userName + ' ';
-      
-      const status = document.createElement('span');
-      status.textContent = '✅';
-      li.appendChild(status);
-      
-      const actionSelect = this.component._createParticipantActionSelect({
-        userId: payload.userId,
-        userName: payload.userName,
-        blocked: false
-      });
-      li.appendChild(actionSelect);
-      
-      ul.appendChild(li);
+      // Check if participant already exists
+      const existingParticipant = ul.querySelector(`[data-user-id="${payload.userId}"]`);
+      if (!existingParticipant) {
+        const li = document.createElement('li');
+        li.dataset.userId = payload.userId;
+        li.textContent = payload.userName + ' ';
+        
+        const status = document.createElement('span');
+        status.textContent = '✅';
+        li.appendChild(status);
+        
+        // Only add action select if we have the method (admin view)
+        if (this.component._createParticipantActionSelect) {
+          const actionSelect = this.component._createParticipantActionSelect({
+            userId: payload.userId,
+            userName: payload.userName,
+            blocked: false
+          });
+          li.appendChild(actionSelect);
+        }
+        
+        ul.appendChild(li);
+      }
     }
 
     // Update players section with avatar (for both admin and joiner views)
     const playersSection = this.component.shadowRoot.getElementById('playersSection');
     if (playersSection) {
-      const existingPlayers = playersSection.querySelectorAll('.player');
-      const avatarIndex = existingPlayers.length + 1; // Next available avatar
-      
-      const div = document.createElement('div');
-      div.className = 'player';
-      div.dataset.value = '?';
-      div.dataset.userId = payload.userId;
+      // Check if player already exists
+      const existingPlayer = playersSection.querySelector(`[data-user-id="${payload.userId}"]`);
+      if (!existingPlayer) {
+        const existingPlayers = playersSection.querySelectorAll('.player');
+        const avatarIndex = Math.min(existingPlayers.length + 1, 9); // Max 9 avatars
+        
+        const div = document.createElement('div');
+        div.className = 'player';
+        div.dataset.value = '?';
+        div.dataset.userId = payload.userId;
 
-      const img = document.createElement('img');
-      img.src = `avatare/avatar_${avatarIndex}.jpeg`;
-      img.alt = payload.userName;
-      div.appendChild(img);
+        const img = document.createElement('img');
+        img.src = `avatare/avatar_${avatarIndex}.jpeg`;
+        img.alt = payload.userName;
+        div.appendChild(img);
 
-      // Add empty vote card next to avatar
-      const voteCard = document.createElement('div');
-      voteCard.className = 'vote-card';
-      voteCard.style.cssText = `
-        width: 30px;
-        height: 40px;
-        border: 2px solid #ddd;
-        border-radius: 5px;
-        background: white;
-        margin: 0 5px;
-        transition: background-color 0.3s ease;
-      `;
-      div.appendChild(voteCard);
+        // Add empty vote card next to avatar
+        const voteCard = document.createElement('div');
+        voteCard.className = 'vote-card';
+        voteCard.style.cssText = `
+          width: 30px;
+          height: 40px;
+          border: 2px solid #ddd;
+          border-radius: 5px;
+          background: white;
+          margin: 0 5px;
+          transition: background-color 0.3s ease;
+        `;
+        div.appendChild(voteCard);
 
-      const span = document.createElement('span');
-      span.textContent = payload.userName;
-      div.appendChild(span);
+        const span = document.createElement('span');
+        span.textContent = payload.userName;
+        div.appendChild(span);
 
-      playersSection.appendChild(div);
+        playersSection.appendChild(div);
+      }
     }
   }
 
@@ -352,4 +360,6 @@ export class MessageHandler {
     // Reset voting when story changes
     this.component._resetVoting();
   }
+
+
 }

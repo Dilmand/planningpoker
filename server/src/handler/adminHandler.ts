@@ -165,11 +165,17 @@ export class AdminHandler extends BaseHandler {
 
         // targetClientIp now represents IP address
         this.roomManager.leaveRoom(payload.roomId!, payload.targetClientIp);
-        await this.sendSuccess(client, {
-            action: "removeRoom",
-            roomId: payload.roomId,
-            targetClientIp: payload.targetClientIp,
-        });
+        
+        // Broadcast to all clients in the room about the removal
+        await this.broadcastNotification(
+            payload.roomId!,
+            "userRemoved",
+            {
+                targetClientIp: payload.targetClientIp,
+                removedByAdmin: client.getClientName(),
+                adminId: client.getIP(),
+            }
+        );
     }
 
     private async processBlockUser(
@@ -226,14 +232,19 @@ export class AdminHandler extends BaseHandler {
             });
         }
         
-        // Send success response to admin
-        await this.sendSuccess(client, {
-            action: "blockUser",
-            targetClientIp: payload.targetClientIp,
-            targetIP,
-            wasInRoom: isInRoom,
-            message: `IP ${targetIP} has been blocked in room ${payload.roomId}${isInRoom ? ' and user was removed from the room' : ''}.`,
-        });
+        // Broadcast to the admin about the successful block action
+        await this.broadcastNotification(
+            payload.roomId!,
+            "userBlockSuccess",
+            {
+                targetClientIp: payload.targetClientIp,
+                targetIP,
+                wasInRoom: isInRoom,
+                message: `IP ${targetIP} has been blocked in room ${payload.roomId}${isInRoom ? ' and user was removed from the room' : ''}.`,
+                adminId: client.getIP(),
+                adminName: client.getClientName(),
+            }
+        );
         
         console.log(
             `Admin ${client.getClientName()} blocked IP ${targetIP} in room ${payload.roomId}${isInRoom ? ' and removed user from room' : ''}`,
@@ -271,12 +282,18 @@ export class AdminHandler extends BaseHandler {
             reason: "unblocked by admin"
         });
 
-        await this.sendSuccess(client, {
-            action: "unblockUser",
-            targetClientIp: payload.targetClientIp,
-            targetIP,
-            message: `IP ${targetIP} has been unblocked in room ${payload.roomId}`,
-        });
+        // Broadcast to the admin about the successful unblock action
+        await this.broadcastNotification(
+            payload.roomId!,
+            "userUnblockSuccess",
+            {
+                targetClientIp: payload.targetClientIp,
+                targetIP,
+                message: `IP ${targetIP} has been unblocked in room ${payload.roomId}`,
+                adminId: client.getIP(),
+                adminName: client.getClientName(),
+            }
+        );
         console.log(
             `Admin ${client.getClientName()} unblocked IP ${targetIP} in room ${payload.roomId}`,
         );
@@ -334,12 +351,18 @@ export class AdminHandler extends BaseHandler {
             };
         });
 
-        await this.sendSuccess(client, {
-            action: "getBlockedUsers",
-            roomId: payload.roomId,
-            blockedUsers: blockedUsersInfo,
-            count: blockedIPs.length,
-        });
+        // Broadcast to the admin with the blocked users information
+        await this.broadcastNotification(
+            payload.roomId!,
+            "blockedUsersInfo",
+            {
+                roomId: payload.roomId,
+                blockedUsers: blockedUsersInfo,
+                count: blockedIPs.length,
+                requestedBy: client.getClientName(),
+                adminId: client.getIP(),
+            }
+        );
     }
 
     private async processChangeCurrentStory(
@@ -385,19 +408,10 @@ export class AdminHandler extends BaseHandler {
                     id: story.id,
                     title: story.title,
                     description: story.description,
-                }
+                },
+                changedBy: client.getClientName(),
+                adminId: client.getIP(),
             }
         );
-
-        await this.sendSuccess(client, {
-            action: "changeCurrentStory",
-            roomId: payload.roomId,
-            storyId: payload.storyId,
-            story: {
-                id: story.id,
-                title: story.title,
-                description: story.description,
-            }
-        });
     }
 }

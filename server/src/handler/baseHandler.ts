@@ -48,15 +48,7 @@ export abstract class BaseHandler implements IMessageHandler {
         });
     }
 
-    protected async sendSuccess(
-        client: WebSocketClient,
-        message: any,
-    ): Promise<void> {
-        await client.send({
-            type: "success",
-            payload: message,
-        });
-    }
+
 
     protected validateRequiredFields(
         payload: BasePayload,
@@ -108,24 +100,16 @@ export abstract class BaseHandler implements IMessageHandler {
             return;
         }
 
-        // Send success response to the voting client
-        await this.sendSuccess(client, {
-            action: "vote",
-            storyId: payload.storyId,
-            voteValue: payload.voteValue,
-            userId: client.getIP(),
-        });
-
-        // Broadcast to all OTHER clients in the room that someone voted
-        await this.broadcastGameAction(
+        // Broadcast to ALL clients in the room that someone voted (including the voter)
+        await this.broadcastNotification(
             payload.roomId!,
             "userVoted",
-            client,
             {
                 userId: client.getIP(),
                 userName: client.getClientName(),
                 voteValue: payload.voteValue,
                 storyId: payload.storyId,
+                isOwnVote: true, // This will be true for the voting client
             }
         );
     }
@@ -164,22 +148,16 @@ export abstract class BaseHandler implements IMessageHandler {
             return;
         }
 
-        // Send success response to the admin who initiated the reveal
-        await this.sendSuccess(client, {
-            action: "revealCards",
-            storyId: payload.storyId,
-            votes: Votes,
-        });
-
-        // Broadcast to all OTHER clients in the room
-        await this.broadcastGameAction(
+        // Broadcast to ALL clients in the room that cards were revealed
+        await this.broadcastNotification(
             payload.roomId!,
             "cardsRevealed",
-            client,
             {
                 storyId: payload.storyId,
                 votes: Votes,
-            },
+                initiatorName: client.getClientName(),
+                initiatorId: client.getIP(),
+            }
         );
 
 
@@ -203,9 +181,18 @@ export abstract class BaseHandler implements IMessageHandler {
         await this.broadcastUserAction(roomId, "userLeft", client);
 
         this.roomManager.leaveRoom(roomId, client.getIP());
-        await this.sendSuccess(client, {
-            action: "leaveRoom",
-            roomId: roomId,
+        
+        // Send separate notification to the leaving client
+        await client.send({
+            type: "notification",
+            payload: {
+                action: "userLeft",
+                userName: client.getClientName(),
+                userId: client.getIP(),
+                isAdmin: this.roomManager.isAdmin(roomId, client.getIP()),
+                isOwnAction: true,
+                roomId: roomId,
+            },
         });
     }
 
@@ -245,18 +232,24 @@ export abstract class BaseHandler implements IMessageHandler {
         const roomName = this.roomManager.getRoomName(roomId);
         const participants = this.getParticipantsInRoom(roomId);
 
-        // Send success response to the joining client
-        await this.sendSuccess(client, {
-            action: "joinRoom",
-            roomId: roomId,
-            roomName: roomName,
-            userName: payload.userName,
-            participants: participants,
-            stories: this.roomManager.getStoriesInRoom(roomId),
-            currentStory: this.roomManager.getCurrentStory(roomId),
+        // Send notification to the joining client with their own perspective
+        await client.send({
+            type: "notification",
+            payload: {
+                action: "userJoined",
+                userName: payload.userName,
+                userId: client.getIP(),
+                isAdmin: this.roomManager.isAdmin(roomId, client.getIP()),
+                roomId: roomId,
+                roomName: roomName,
+                participants: participants,
+                stories: this.roomManager.getStoriesInRoom(roomId),
+                currentStory: this.roomManager.getCurrentStory(roomId),
+                isOwnAction: true,
+            },
         });
 
-        // Broadcast to all other clients in the room
+        // Broadcast to ALL OTHER clients in the room about the new user
         await this.broadcastUserAction(roomId, "userJoined", client);
     }
 
@@ -271,14 +264,20 @@ export abstract class BaseHandler implements IMessageHandler {
         );
         const participants = this.getParticipantsInRoom(roomId);
 
-        await this.sendSuccess(client, {
-            action: "createRoom",
-            roomId: roomId,
-            roomName: payload.roomName,
-            participants: participants,
-            stories: this.roomManager.getStoriesInRoom(roomId),
-            currentStory: this.roomManager.getCurrentStory(roomId),
-        });
+        // Broadcast to the admin client about successful room creation
+        await this.broadcastNotification(
+            roomId,
+            "roomCreated",
+            {
+                roomId: roomId,
+                roomName: payload.roomName,
+                participants: participants,
+                stories: this.roomManager.getStoriesInRoom(roomId),
+                currentStory: this.roomManager.getCurrentStory(roomId),
+                adminId: client.getIP(),
+                adminName: client.getClientName(),
+            }
+        );
     }
 
     protected validateRoomExists(roomId: string): boolean {
@@ -318,24 +317,11 @@ export abstract class BaseHandler implements IMessageHandler {
 
         await this.broadcastNotification(roomId, action, {
             userName,
-            userId: userIP, // Use IP as userId
+            userId: userIP,
             isAdmin,
             ...additionalData,
-        }, action === "userJoined" ? userIP : undefined);
+        }, action === "userJoined" ? userIP : undefined); // Exclude the joining client
     }
 
-    protected async broadcastGameAction(
-        roomId: string,
-        action: "cardsRevealed" | "cardsReset" | "votingStarted" | "userVoted",
-        initiatorClient: WebSocketClient,
-        gameData?: any,
-    ): Promise<void> {
-        const initiatorName = initiatorClient.getClientName();
 
-        await this.broadcastNotification(roomId, action, {
-            initiatorName,
-            initiatorId: initiatorClient.getIP(), // Use IP instead of client.id
-            ...gameData,
-        }, initiatorClient.getIP()); // Exclude the initiator from receiving the notification
-    }
 }
