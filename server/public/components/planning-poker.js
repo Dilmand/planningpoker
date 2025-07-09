@@ -470,7 +470,7 @@ class PlanningPoker extends HTMLElement {
       if (voteCard) {
         voteCard.textContent = ''; // Karte soll leer bleiben
         voteCard.style.backgroundColor = 'white';
-        voteCard.style.borderColor = '#ddd';
+        voteCard.style.borderColor = 'var(--primary-color)';
       }
 
       // Avatar wieder anzeigen, falls er entfernt wurde
@@ -482,23 +482,6 @@ class PlanningPoker extends HTMLElement {
         player.insertBefore(img, voteCard);
       }
 
-      // Avatar wieder anzeigen, falls er entfernt wurde
-      let img = player.querySelector('img');
-      if (!img) {
-        img = document.createElement('img');
-        img.src = `avatare/avatar_${index + 1}.jpeg`;
-        img.alt = player.dataset.userId || 'Avatar';
-        player.insertBefore(img, voteCard);
-      }
-
-      // Avatar wieder anzeigen, falls er entfernt wurde
-      let img = player.querySelector('img');
-      if (!img) {
-        img = document.createElement('img');
-        img.src = `avatare/avatar_${index + 1}.jpeg`;
-        img.alt = player.dataset.userId || 'Avatar';
-        player.insertBefore(img, voteCard);
-      }
     });
 
     // Clear selected card
@@ -510,6 +493,18 @@ class PlanningPoker extends HTMLElement {
     if (averageDisplay) {
       averageDisplay.textContent = '?';
     }
+  }
+
+  hexToRgba(value, alpha) {
+
+    const primaryColor = getComputedStyle(document.documentElement)
+    .getPropertyValue(value)
+    .trim();
+
+    const r = parseInt(primaryColor.slice(1, 3), 16);
+    const g = parseInt(primaryColor.slice(3, 5), 16);
+    const b = parseInt(primaryColor.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
 
