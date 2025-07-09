@@ -1,13 +1,13 @@
 :host {
     --primary-color: #4f46e5;
-    --background: #f9fafb;
+    --background: inherit;
+    --transparent_bg: rgba(255, 255, 255, 0.7);
     --card-bg: #ffffff;
     --text-color: #111827;
     --subtext-color: #6b7280;
     --border-radius: 0.75rem;
 
-
-  font-family: sans-serif;
+  font-family: inherit;
   background: var(--background);
   color: var(--text-color);
   padding: 1rem;
@@ -21,7 +21,7 @@ main {
   flex: 1;
   max-width: 800px;
   margin: auto;
-  background: white;
+  background: var(--transparent_bg);
   padding: 2rem;
   border-radius: 1rem;
   display: flex;
@@ -34,7 +34,12 @@ header {
 }
 
 .current-story-display {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+background: linear-gradient(
+  135deg,
+  color-mix(in srgb, var(--primary-color), black 30%) 0%,
+  color-mix(in srgb, var(--primary-color), white 40%) 100%
+);
+
   color: white;
   padding: 1.5rem;
   border-radius: var(--border-radius);
@@ -87,6 +92,7 @@ header {
   font-size: 1rem;
   margin-bottom: 1rem;
   background: white;
+  font-family: inherit;
 }
 
 .story-details {
@@ -151,7 +157,7 @@ footer {
 
 .card-select button {
   padding: 0.5rem 1rem;
-  border: 2px solid #3b82f6;
+  border: 2px solid color-mix(in srgb, --primary-color, white 10%);
   background: white;
   border-radius: 6px;
   cursor: pointer;
@@ -159,17 +165,17 @@ footer {
 
 .card-select button.selected {
   background-color: #dbeafe;
-  border-color: #2563eb;
-  color: #1e3a8a;
+  border-color: var(--primary-color);
+  color: color-mix(in srgb, --primary-color, black 20%);
 }
 
 .reveal-below, .reset {
   margin-top: 1rem;
-  padding: 0.6rem 1.2rem;
+  padding: 0.75rem 1.5rem;
   font-weight: bold;
   border: none;
   background: #dbeafe;
-  border-radius: 0.5rem;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -223,6 +229,7 @@ aside li {
 aside select {
   width: 100%;
   padding: 0.3rem;
+  font-family: inherit;
 }
 
 .voting-area {
@@ -245,8 +252,8 @@ aside select {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #fff;
-  border: 2px solid #2196F3;
+  background-color: var(--card-bg);
+  border: 2px solid var(--primary-color);
   border-radius: 5px;
   font-size: 1.5rem;
   font-weight: bold;
@@ -270,7 +277,7 @@ aside select {
 }
 
 #revealCardsButton {
-  background-color: #2196F3;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -314,12 +321,12 @@ aside select {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0,0,0,0.7);
+  background-color: var(--primary-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
   color: white;
   padding: 10px 20px;
   border-radius: 5px;
   z-index: 1000;
-  opacity: 0;
   transition: opacity 0.3s ease;
 }
 

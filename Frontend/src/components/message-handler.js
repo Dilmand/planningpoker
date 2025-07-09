@@ -126,15 +126,8 @@ export class MessageHandler {
         this.updatePlayerVote(payload);
       },
       [NOTIFICATION_ACTIONS.STORY_CHANGED]: () => {
-        const isSameStory = payload.story.id === this.component.currentStoryId;
-
+        this.component.showToast(`Story changed to: ${payload.story.title}`);
         this.updateCurrentStory(payload.story);
-
-        const message = isSameStory
-            ? "Cards have been reset!"
-            : `Story changed to: ${payload.story.title}`;
-
-        this.component.showToast(message);
       }
     };
 
@@ -154,8 +147,8 @@ export class MessageHandler {
       // Update vote card color to indicate vote was cast
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.style.backgroundColor = '#4285f4'; // Blue color
-        voteCard.style.borderColor = '#4285f4';
+        voteCard.style.backgroundColor = 'var(--primary-color'; // Blue color
+        voteCard.style.borderColor = 'var(--primary-color)';
       }
     }
   }

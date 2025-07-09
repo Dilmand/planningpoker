@@ -25,6 +25,17 @@ class PlanningPoker extends HTMLElement {
     this.shadowRoot.innerHTML = '<div>Loading...</div>';
   }
 
+  static get observedAttributes() {
+    return ['primary-color'];
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (name === 'primary-color') {
+      this.style.setProperty('--primary-color', newValue);
+    }
+  }
+
+
   async connectedCallback() {
     const wsURL = this.getAttribute("ws-url");
     try {
@@ -187,7 +198,7 @@ class PlanningPoker extends HTMLElement {
         voteCard.style.cssText = `
           width: 30px;
           height: 40px;
-          border: 2px solid #ddd;
+          border: 2px solid var(--primary-color);
           border-radius: 5px;
           background: white;
           margin: 0 5px;
@@ -216,8 +227,8 @@ class PlanningPoker extends HTMLElement {
           // Update own vote card color
           const ownVoteCard = own.querySelector('.vote-card');
           if (ownVoteCard) {
-            ownVoteCard.style.backgroundColor = '#4285f4';
-            ownVoteCard.style.borderColor = '#4285f4';
+            ownVoteCard.style.backgroundColor = 'var(--primary-color)';
+            ownVoteCard.style.borderColor = 'var(--primary-color)';
           }
         }
         
@@ -264,7 +275,7 @@ class PlanningPoker extends HTMLElement {
         voteCard.style.cssText = `
           width: 30px;
           height: 40px;
-          border: 2px solid #ddd;
+          border: 2px solid var(--primary-color);
           border-radius: 5px;
           background: white;
           margin: 0 5px;
@@ -293,8 +304,8 @@ class PlanningPoker extends HTMLElement {
           // Update own vote card color
           const ownVoteCard = own.querySelector('.vote-card');
           if (ownVoteCard) {
-            ownVoteCard.style.backgroundColor = '#4285f4';
-            ownVoteCard.style.borderColor = '#4285f4';
+            ownVoteCard.style.backgroundColor = 'var(--primary-color)';
+            ownVoteCard.style.borderColor = 'var(--primary-color)';
           }
         }
         
@@ -309,7 +320,7 @@ class PlanningPoker extends HTMLElement {
 
     this.shadowRoot.querySelector('.reset')
       .addEventListener('click', () => {
-        this.wsManager.changeCurrentStory(this.currentStoryId);
+        this._renderAdminRoom(payload);
       });
 
     this.shadowRoot.getElementById('leaveAdminRoomButton')
@@ -356,9 +367,9 @@ class PlanningPoker extends HTMLElement {
   _createParticipantActionSelect(participant) {
     const select = document.createElement('select');
     select.innerHTML = `
-      <option>Aktion wählen</option>
-      <option value="block">User blockieren</option>
-      <option value="unblock">User entblockieren</option>
+      <option>Choose Action</option>
+      <option value="block">Block User</option>
+      <option value="unblock">Unblock User</option>
     `;
     
     select.addEventListener('change', () => {
@@ -452,29 +463,18 @@ class PlanningPoker extends HTMLElement {
 
   _resetVoting() {
     // Clear all player votes
-    this.shadowRoot.querySelectorAll('.player').forEach((player, index) => {
+    this.shadowRoot.querySelectorAll('.player').forEach(player => {
       player.dataset.value = '?';
-
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.textContent = ''; // Karte soll leer bleiben
         voteCard.style.backgroundColor = 'white';
-        voteCard.style.borderColor = '#ddd';
-      }
-
-      // Avatar wieder anzeigen, falls er entfernt wurde
-      let img = player.querySelector('img');
-      if (!img) {
-        img = document.createElement('img');
-        img.src = `avatare/avatar_${index + 1}.jpeg`;
-        img.alt = player.dataset.userId || 'Avatar';
-        player.insertBefore(img, voteCard);
+        voteCard.style.borderColor = 'var(--primary-color)';
       }
     });
 
     // Clear selected card
     this.shadowRoot.querySelectorAll('.card-select button')
-        .forEach(btn => btn.classList.remove('selected'));
+      .forEach(btn => btn.classList.remove('selected'));
 
     // Reset average display
     const averageDisplay = this.shadowRoot.querySelector('.average-display');
@@ -483,25 +483,24 @@ class PlanningPoker extends HTMLElement {
     }
   }
 
+  hexToRgba(value, alpha) {
+
+    const primaryColor = getComputedStyle(document.documentElement)
+    .getPropertyValue(value)
+    .trim();
+
+    const r = parseInt(primaryColor.slice(1, 3), 16);
+    const g = parseInt(primaryColor.slice(3, 5), 16);
+    const b = parseInt(primaryColor.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
 
   showToast(message) {
     let toast = this.shadowRoot.getElementById('toast');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'toast';
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        z-index: 1000;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      `;
       this.shadowRoot.appendChild(toast);
     }
     toast.textContent = message;
