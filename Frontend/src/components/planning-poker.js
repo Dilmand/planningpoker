@@ -187,7 +187,7 @@ class PlanningPoker extends HTMLElement {
         voteCard.style.cssText = `
           width: 30px;
           height: 40px;
-          border: 2px solid #ddd;
+          border: 2px solid var(--primary-color);
           border-radius: 5px;
           background: white;
           margin: 0 5px;
@@ -216,8 +216,8 @@ class PlanningPoker extends HTMLElement {
           // Update own vote card color
           const ownVoteCard = own.querySelector('.vote-card');
           if (ownVoteCard) {
-            ownVoteCard.style.backgroundColor = '#4285f4';
-            ownVoteCard.style.borderColor = '#4285f4';
+            ownVoteCard.style.backgroundColor = 'var(--primary-color)';
+            ownVoteCard.style.borderColor = 'var(--primary-color)';
           }
         }
         
@@ -264,7 +264,7 @@ class PlanningPoker extends HTMLElement {
         voteCard.style.cssText = `
           width: 30px;
           height: 40px;
-          border: 2px solid #ddd;
+          border: 2px solid var(--primary-color);
           border-radius: 5px;
           background: white;
           margin: 0 5px;
@@ -293,8 +293,8 @@ class PlanningPoker extends HTMLElement {
           // Update own vote card color
           const ownVoteCard = own.querySelector('.vote-card');
           if (ownVoteCard) {
-            ownVoteCard.style.backgroundColor = '#4285f4';
-            ownVoteCard.style.borderColor = '#4285f4';
+            ownVoteCard.style.backgroundColor = 'var(--primary-color)';
+            ownVoteCard.style.borderColor = 'var(--primary-color)';
           }
         }
         
@@ -457,7 +457,7 @@ class PlanningPoker extends HTMLElement {
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
         voteCard.style.backgroundColor = 'white';
-        voteCard.style.borderColor = '#ddd';
+        voteCard.style.borderColor = 'var(--primary-color)';
       }
     });
 
@@ -472,24 +472,24 @@ class PlanningPoker extends HTMLElement {
     }
   }
 
+  hexToRgba(value, alpha) {
+
+    const primaryColor = getComputedStyle(document.documentElement)
+    .getPropertyValue(value)
+    .trim();
+
+    const r = parseInt(primaryColor.slice(1, 3), 16);
+    const g = parseInt(primaryColor.slice(3, 5), 16);
+    const b = parseInt(primaryColor.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+
   showToast(message) {
     let toast = this.shadowRoot.getElementById('toast');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'toast';
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        z-index: 1000;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      `;
       this.shadowRoot.appendChild(toast);
     }
     toast.textContent = message;
