@@ -60,6 +60,8 @@ export class MessageHandler {
   }
 
   handleNotificationMessage(payload, ws, role) {
+    console.log('Handling notification:', payload.action, payload);
+    
     const notificationHandlers = {
       [NOTIFICATION_ACTIONS.USER_JOINED]: () => {
         // Handle both joining as a new user and getting the full room state
@@ -136,6 +138,27 @@ export class MessageHandler {
             : `Story changed to: ${payload.story.title}`;
 
         this.component.showToast(message);
+      },
+      [NOTIFICATION_ACTIONS.ROOM_CREATED]: () => {
+        // Handle room creation success
+        console.log('Room created successfully:', payload);
+        this.component.showToast(`Room "${payload.roomName}" created successfully!`);
+        this.component._renderAdminRoom(payload);
+      },
+      [NOTIFICATION_ACTIONS.USER_REMOVED]: () => {
+        this.component.showToast(`User ${payload.targetClientIp} was removed from the room`);
+        this.removeParticipantFromList(payload.targetClientIp);
+      },
+      [NOTIFICATION_ACTIONS.USER_BLOCK_SUCCESS]: () => {
+        this.component.showToast(`IP ${payload.targetIP || payload.targetClientIp} blocked successfully`);
+      },
+      [NOTIFICATION_ACTIONS.USER_UNBLOCK_SUCCESS]: () => {
+        this.component.showToast(`User unblocked: ${payload.targetClientIp}`);
+      },
+      [NOTIFICATION_ACTIONS.BLOCKED_USERS_INFO]: () => {
+        // Handle blocked users info response
+        console.log('Blocked users:', payload.blockedUsers);
+        // You could update a UI component here to show the blocked users list
       }
     };
 
@@ -143,7 +166,13 @@ export class MessageHandler {
     if (handler) {
       handler();
     } else {
-      console.warn('Unknown notification action:', payload.action);
+      console.warn('Unknown notification action:', payload.action, 'Available actions:', Object.keys(NOTIFICATION_ACTIONS));
+      // Fallback for room creation if action name doesn't match exactly
+      if (payload.action === 'roomCreated' || payload.roomId) {
+        console.log('Attempting fallback room creation handler');
+        this.component.showToast(`Room "${payload.roomName || 'Unnamed'}" created successfully!`);
+        this.component._renderAdminRoom(payload);
+      }
     }
   }
   
@@ -155,7 +184,7 @@ export class MessageHandler {
       // Update vote card color to indicate vote was cast
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.style.backgroundColor = 'var(--primary-color)';// Blue color
+        voteCard.style.backgroundColor = 'var(--primary-color)';
         voteCard.style.borderColor = 'var(--primary-color)';
       }
     }
