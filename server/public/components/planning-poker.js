@@ -320,7 +320,7 @@ class PlanningPoker extends HTMLElement {
 
     this.shadowRoot.querySelector('.reset')
       .addEventListener('click', () => {
-        this._renderAdminRoom(payload);
+        this.wsManager.changeCurrentStory(this.currentStoryId);
       });
 
     this.shadowRoot.getElementById('leaveAdminRoomButton')
@@ -463,18 +463,29 @@ class PlanningPoker extends HTMLElement {
 
   _resetVoting() {
     // Clear all player votes
-    this.shadowRoot.querySelectorAll('.player').forEach(player => {
+    this.shadowRoot.querySelectorAll('.player').forEach((player, index) => {
       player.dataset.value = '?';
+
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
+        voteCard.textContent = ''; // Karte soll leer bleiben
         voteCard.style.backgroundColor = 'white';
         voteCard.style.borderColor = 'var(--primary-color)';
+      }
+
+      // Avatar wieder anzeigen, falls er entfernt wurde
+      let img = player.querySelector('img');
+      if (!img) {
+        img = document.createElement('img');
+        img.src = `avatare/avatar_${index + 1}.jpeg`;
+        img.alt = player.dataset.userId || 'Avatar';
+        player.insertBefore(img, voteCard);
       }
     });
 
     // Clear selected card
     this.shadowRoot.querySelectorAll('.card-select button')
-      .forEach(btn => btn.classList.remove('selected'));
+        .forEach(btn => btn.classList.remove('selected'));
 
     // Reset average display
     const averageDisplay = this.shadowRoot.querySelector('.average-display');
@@ -494,7 +505,6 @@ class PlanningPoker extends HTMLElement {
     const b = parseInt(primaryColor.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
-
 
   showToast(message) {
     let toast = this.shadowRoot.getElementById('toast');
