@@ -160,7 +160,7 @@ footer {
 
 .card-select button {
   padding: 0.5rem 1rem;
-  border: 2px solid color-mix(in srgb, var(--primary-color), white 10%);
+  border: 2px solid color-mix(in srgb, --primary-color, white 10%);
   background: white;
   border-radius: 6px;
   cursor: pointer;
@@ -169,7 +169,7 @@ footer {
 .card-select button.selected {
   background-color: #dbeafe;
   border-color: var(--primary-color);
-  color: color-mix(in srgb, var(--primary-color), black 20%);
+  color: color-mix(in srgb, --primary-color, black 20%);
 }
 
 .reveal-below, .reset {
