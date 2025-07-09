@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Planning Poker</title>
 </head>
 <body>
     <script type="module" src="components/planning-poker.js"></script>
-    <planning-poker id="poker">
+    <planning-poker id="poker" ws-url="ws://172.20.10.4:8699">
         {
             "stories": [
                 {
@@ -28,11 +28,5 @@
             ]
         }
     </planning-poker>
-    <script>
-        const hostname = window.location.hostname;
-        const url = `ws://${hostname}:8699`;
-        const pokerElement = document.getElementById('poker');
-        pokerElement.setAttribute('ws-url', url);
-    </script>
 </body>
 </html>
