@@ -130,6 +130,7 @@ export class MessageHandler {
         const isSameStory = payload.story.id === this.component.currentStoryId;
 
         this.updateCurrentStory(payload.story);
+
         const message = isSameStory
             ? "Cards have been reset!"
             : `Story changed to: ${payload.story.title}`;
