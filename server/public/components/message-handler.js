@@ -119,13 +119,8 @@ export class MessageHandler {
         }
       },
       [NOTIFICATION_ACTIONS.USER_VOTED]: () => {
-        if (payload.isOwnVote) {
-          // This is my own vote
-          this.component.showToast(`Vote recorded: ${payload.voteValue}`);
-        } else {
-          // Someone else voted
-          this.component.showToast(`${payload.userName} voted`);
-        }
+
+        this.component.showToast(`${payload.userName} voted`);
         this.updatePlayerVote(payload);
       },
       [NOTIFICATION_ACTIONS.STORY_CHANGED]: () => {
