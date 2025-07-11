@@ -240,6 +240,7 @@ class PlanningPoker extends HTMLElement {
     this.shadowRoot.getElementById('leaveRoomButton')
       .addEventListener('click', () => {
         this.wsManager.leaveRoom();
+        this.renderPage('home');
       });
   }
 
@@ -324,7 +325,7 @@ class PlanningPoker extends HTMLElement {
         this.wsManager.changeCurrentStory(this.currentStoryId);
       });
 
-    this.shadowRoot.getElementById('leaveAdminRoomButton')
+    this.shadowRoot.getElementById('leaveRoomButton')
       .addEventListener('click', () => {
         this.wsManager.leaveRoom();
       });
@@ -642,4 +643,4 @@ class PlanningPoker extends HTMLElement {
   }
 }
 
-customElements.define("planning-poker", PlanningPoker);
+// customElements.define("planning-poker", PlanningPoker);
