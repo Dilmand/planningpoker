@@ -571,9 +571,16 @@ class PlanningPoker extends HTMLElement {
 
       const voteCard = player.querySelector('.vote-card');
       if (voteCard) {
-        voteCard.textContent = ''; // Karte soll leer bleiben
-        voteCard.style.backgroundColor = 'white';
-        voteCard.style.borderColor = '#ddd';
+        voteCard.textContent = '';
+        voteCard.style.cssText = `
+        width: 30px;
+        height: 40px;
+        border: 2px solid var(--primary-color);
+        border-radius: 5px;
+        background: white;
+        margin: 0 5px;
+        transition: background-color 0.3s ease;
+      `;
       }
 
       // Avatar wieder anzeigen, falls er entfernt wurde

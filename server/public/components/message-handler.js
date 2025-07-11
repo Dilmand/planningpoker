@@ -277,7 +277,7 @@ export class MessageHandler {
         voteCard.style.cssText = `
           width: 30px;
           height: 40px;
-          border: 2px solid #ddd;
+          border: 2px solid var(--primary-color);
           border-radius: 5px;
           background: white;
           margin: 0 5px;
