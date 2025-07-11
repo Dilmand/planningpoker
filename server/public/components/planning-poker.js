@@ -643,4 +643,4 @@ class PlanningPoker extends HTMLElement {
   }
 }
 
-// customElements.define("planning-poker", PlanningPoker);
+customElements.define("planning-poker", PlanningPoker);
